@@ -1,0 +1,3311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrewOps — Café Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
+<!-- Firebase — Online Orders (paste your project config in the JS section below) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root {
+ --bg:#f5f0e8; --surface:#fffdf8; --s2:#f0e8d8; --s3:#e8dcc8;
+ --border:#d8ccb8; --border2:#c4b49a;
+ --gold:#8b5e3c; --gold2:#6b4423;
+ --green:#4a7c59; --red:#b85450; --blue:#4a7a9b; --purple:#7a5c8a; --orange:#c4703a;
+ --text:#2c1f0e; --muted:#7a6a55; --dim:#b0a090;
+ --mono:'Share Tech Mono','Courier New',monospace;
+ --sans:'DM Sans',system-ui,sans-serif;
+ --radius:7px;
+ --cream:#faf6ee;
+ --brown-dark:#3d2410;
+ --brown-mid:#6b4423;
+ --brown-light:#a07850;
+ --beige-warm:#e8d5b8;
+ --beige-light:#f5ede0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px;background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a07850' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--beige-warm);}
+::-webkit-scrollbar-thumb{background:var(--brown-light);border-radius:3px;}
+
+/* ── HEADER ── */
+#hdr{background:var(--brown-dark);border-bottom:3px solid var(--brown-mid);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(61,36,16,0.25);}
+#hdr-left{display:flex;align-items:center;gap:10px;}
+#shop-display{font-family:var(--mono);font-size:19px;font-weight:900;color:#f5ede0;letter-spacing:2px;}
+.badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:1px;}
+.badge-admin{background:var(--beige-warm);color:var(--brown-dark);display:none;}
+.badge-staff{background:#5a3a1a;color:#c4a888;border:1px solid #7a5030;}
+#hdr-right{display:flex;gap:7px;align-items:center;}
+#clock-display{font-family:var(--mono);font-size:12px;color:#c4a888;margin-right:4px;}
+
+/* ── NAV ── */
+#nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 18px;display:flex;gap:1px;overflow-x:auto;white-space:nowrap;box-shadow:0 1px 6px rgba(61,36,16,0.08);}
+.nb{background:transparent;color:var(--muted);border:none;padding:10px 13px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--sans);letter-spacing:.7px;border-bottom:2px solid transparent;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
+.nb:hover{color:var(--brown-mid);}
+.nb.active{color:var(--surface);background:var(--brown-mid);border-bottom-color:var(--brown-mid);}
+.nb.admin-only{display:none;}
+
+/* ── MAIN ── */
+#main{padding:18px;max-width:1400px;margin:0 auto;}
+.tab{display:none;}.tab.active{display:block;animation:tabIn .22s cubic-bezier(.22,.68,0,1.1);}
+@keyframes tabIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tabOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-5px)}}
+/* Daily sold-out overlay on POS grid */
+.mi.sold-out{opacity:.42;cursor:not-allowed;position:relative;}
+.mi.sold-out::after{content:'SOLD OUT';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,.55);color:#fff;font-size:9px;font-weight:900;letter-spacing:2px;border-radius:inherit;}
+.mi-dlimit{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:3px;color:var(--dim);}
+
+/* ── TYPOGRAPHY ── */
+.sh{font-family:var(--mono);font-size:14px;font-weight:900;color:var(--brown-mid);letter-spacing:1px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:9px;}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px;box-shadow:0 1px 4px rgba(61,36,16,0.07);}
+.ct{font-size:11px;font-weight:700;color:var(--brown-mid);margin-bottom:12px;letter-spacing:1px;font-family:var(--mono);}
+
+/* ── STAT CARDS ── */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px;margin-bottom:18px;}
+.sc{background:var(--surface);border-radius:var(--radius);padding:13px 15px;border:1px solid var(--border);}
+.sl{font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:5px;font-family:var(--mono);}
+.sv{font-size:20px;font-weight:900;font-family:var(--mono);color:var(--brown-dark);}
+.ss{font-size:10px;color:var(--dim);margin-top:3px;}
+
+/* ── INPUTS ── */
+input,select,textarea{background:var(--cream);border:1px solid var(--border2);border-radius:5px;padding:7px 10px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--brown-mid);box-shadow:0 0 0 2px rgba(107,68,35,0.12);}
+input::placeholder,textarea::placeholder{color:var(--dim);}
+select option{background:var(--cream);}
+textarea{resize:vertical;}
+
+/* ── BUTTONS ── */
+.btn{border:none;border-radius:5px;padding:7px 13px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--sans);display:inline-flex;align-items:center;gap:5px;letter-spacing:.3px;transition:opacity .15s,transform .1s;}
+.btn:hover{opacity:.85;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.3;cursor:not-allowed;}
+.btn-g{background:var(--brown-mid);color:#fff;}
+.btn-d{background:var(--s3);color:var(--text);border:1px solid var(--border2);}
+.btn-r{background:#f5e8e8;color:var(--red);border:1px solid #e0c0c0;}
+.btn-b{background:#e8f0f5;color:var(--blue);border:1px solid #c0d4e0;}
+.btn-f{width:100%;justify-content:center;}
+.btn-sm{padding:4px 8px;font-size:11px;}
+.bico{padding:5px 7px;background:var(--s3);border:1px solid var(--border2);border-radius:4px;cursor:pointer;color:var(--text);font-size:12px;transition:border-color .15s;}
+.bico:hover{border-color:var(--brown-mid);}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{background:var(--s2);}
+th{padding:9px 11px;text-align:left;color:var(--brown-mid);font-weight:700;font-size:10px;letter-spacing:.9px;white-space:nowrap;font-family:var(--mono);}
+td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:hover td{background:var(--beige-light);}
+.erow{color:var(--dim);font-size:12px;padding:20px;text-align:center;}
+
+/* ── FORM ── */
+.frow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fg label{font-size:9px;color:var(--muted);letter-spacing:.8px;font-family:var(--mono);}
+
+/* ── BILLING ── */
+#bl{display:flex;gap:18px;flex-wrap:wrap;}
+#mp{flex:2;min-width:300px;}
+#cp{flex:1;min-width:280px;}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;}
+.mi{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:11px 10px;cursor:pointer;text-align:left;transition:border-color .12s,transform .1s,box-shadow .12s;}
+.mi:hover{border-color:var(--brown-mid);transform:translateY(-1px);box-shadow:0 3px 10px rgba(107,68,35,0.15);}
+.mi:active{transform:scale(.97);}
+.mic{font-size:10px;color:var(--muted);margin-bottom:3px;}
+.min{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px;}
+.mip{color:var(--brown-mid);font-weight:900;font-size:14px;font-family:var(--mono);}
+.mig{font-size:8px;color:var(--dim);margin-top:2px;}
+.cflt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;}
+.cfb{background:var(--s2);color:var(--muted);border:1px solid var(--border2);border-radius:18px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);transition:all .12s;}
+.cfb:hover,.cfb.active{background:var(--brown-mid);color:#fff;border-color:var(--brown-mid);}
+
+/* ── CART ── */
+.ci{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);}
+.cin{flex:1;}
+.cin-name{font-size:12px;font-weight:600;}
+.cin-u{font-size:10px;color:var(--muted);}
+.qc{display:flex;align-items:center;gap:3px;}
+.qb{background:var(--s3);border:1px solid var(--border2);border-radius:3px;color:var(--text);width:21px;height:21px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);}
+.qb:hover{border-color:var(--brown-mid);}
+.qn{font-size:13px;font-weight:700;min-width:18px;text-align:center;font-family:var(--mono);}
+.cit{font-size:12px;font-weight:700;color:var(--brown-mid);min-width:62px;text-align:right;font-family:var(--mono);}
+.csum{border-top:1px dashed var(--border2);padding-top:11px;margin-top:11px;}
+.srow{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;font-family:var(--mono);}
+.srow.tot{font-size:15px;font-weight:900;color:var(--brown-mid);margin-top:7px;border-top:1px solid var(--border2);padding-top:7px;}
+.pms{display:flex;gap:5px;margin-bottom:12px;}
+.pmb{flex:1;padding:6px;font-size:10px;font-weight:700;border:1px solid var(--border2);border-radius:4px;cursor:pointer;background:var(--s2);color:var(--muted);font-family:var(--sans);transition:all .12s;text-transform:uppercase;}
+.pmb.active{background:var(--brown-mid);color:#fff;border-color:var(--brown-mid);}
+#ce{text-align:center;color:var(--dim);padding:28px 0;font-size:12px;}
+#citems{max-height:280px;overflow-y:auto;}
+
+/* ── MODAL ── */
+.mo{display:none;position:fixed;inset:0;background:rgba(45,25,10,0.75);z-index:999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
+.mo.open{display:flex;}
+.mb{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:22px;width:100%;box-shadow:0 8px 32px rgba(61,36,16,0.25);}
+
+/* ── RECEIPT ── */
+.rp{background:#fff;color:#000;font-family:var(--mono);font-size:11.5px;line-height:1.75;padding:20px 22px;border-radius:3px;max-height:82vh;overflow-y:auto;width:320px;}
+.rp-center{text-align:center;}
+.rp-shop{font-weight:900;font-size:15px;letter-spacing:1px;}
+.rp-div{border:none;border-top:1px dashed #999;margin:6px 0;}
+.rp-row{display:flex;justify-content:space-between;margin-bottom:1px;}
+.rp-total{display:flex;justify-content:space-between;font-weight:900;font-size:14px;border-top:1.5px solid #000;padding-top:5px;margin-top:5px;}
+
+/* ── CHEF KOT ── */
+.kot{background:#fdf6ee;color:#2c1f0e;font-family:var(--mono);font-size:13px;line-height:1.9;padding:18px 20px;border-radius:3px;max-height:82vh;overflow-y:auto;width:300px;border:2px dashed #8b5e3c;}
+.kot-title{font-size:18px;font-weight:900;text-align:center;letter-spacing:2px;margin-bottom:4px;}
+.kot-sub{text-align:center;font-size:11px;color:#666;margin-bottom:10px;}
+.kot-item{display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:4px 0;border-bottom:1px dashed #ddd;}
+
+/* ── PRINT ── */
+@media print{
+ /* DEFAULT: hide everything */
+ body *{visibility:hidden;}
+ .no-print{display:none!important;}
+
+ /* BILL / KOT print (thermal 80mm) */
+ body.print-bill *{visibility:hidden;}
+ body.print-bill .print-area,
+ body.print-bill .print-area *{visibility:visible;}
+ body.print-bill .print-area{position:fixed;left:0;top:0;width:80mm;font-family:'Courier New',monospace;}
+
+ /* REPORT print (full page) */
+ body.print-report #hdr,
+ body.print-report #nav,
+ body.print-report .no-print{display:none!important;}
+ body.print-report *{visibility:visible;}
+ body.print-report{background:#fff;color:#000;}
+ body.print-report #main{padding:0;max-width:100%;}
+ body.print-report .tab{display:none!important;}
+ body.print-report .tab.active{display:block!important;}
+ body.print-report #rpt-daily-panel,
+ body.print-report #rpt-monthly-panel{display:block!important;}
+ body.print-report #report-block,
+ body.print-report #monthly-report-block{display:block!important;}
+ /* Make report readable on white paper */
+ body.print-report [style*="var(--bg)"],
+ body.print-report [style*="var(--surface)"],
+ body.print-report [style*="var(--s2)"]{background:#fff!important;}
+ body.print-report [style*="var(--text)"],
+ body.print-report [style*="var(--muted)"]{color:#333!important;}
+ body.print-report [style*="var(--gold)"]{color:#b8860b!important;}
+ body.print-report [style*="var(--green)"]{color:#1a7a3c!important;}
+ body.print-report [style*="var(--red)"]{color:#c0392b!important;}
+ body.print-report [style*="var(--orange)"]{color:#c0621a!important;}
+ body.print-report [style*="var(--purple)"]{color:#6a1aab!important;}
+ body.print-report [style*="var(--border)"]{border-color:#ccc!important;}
+ body.print-report .card,
+ body.print-report #monthly-printable{background:#fff!important;border-color:#ccc!important;}
+}
+
+/* UTILS */
+.green{color:var(--green);} .red{color:var(--red);} .gold{color:var(--brown-mid);} .blue{color:var(--blue);} .muted{color:var(--muted);} .mono{font-family:var(--mono);}
+.check-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--brown-mid);cursor:pointer;}
+.sep{border:none;border-top:1px solid var(--border);margin:12px 0;}
+.chip{background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono);}
+.alert{padding:8px 12px;border-radius:5px;font-size:11px;margin-bottom:10px;}
+.alert-warn{background:#faf3e0;border:1px solid #d4a500;color:#8b6914;}
+.alert-ok{background:#edf5f0;border:1px solid #4a7c59;color:var(--green);}
+.alert-err{background:#faf0f0;border:1px solid #d4a0a0;color:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+@keyframes _toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+ <div id="hdr-left">
+ <!-- Logo display (upload only available to admin in Settings) -->
+ <div id="logo-wrap" style="position:relative;">
+ <img id="cafe-logo-img" src="" alt="" style="display:none;width:38px;height:38px;border-radius:6px;object-fit:contain;border:2px solid rgba(255,255,255,0.2);">
+ <div id="cafe-logo-placeholder" style="width:38px;height:38px;border-radius:6px;background:rgba(255,255,255,0.1);border:2px dashed rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:18px;"></div>
+ <input type="file" id="logo-file-input" accept="image/*" onchange="uploadCafeLogo(this)" style="display:none;">
+ </div>
+ <span id="shop-display">BrewOps</span>
+ <span class="badge badge-admin" id="ab">ADMIN</span>
+ <span class="badge badge-staff">STAFF</span>
+ </div>
+ <div id="hdr-right">
+ <span id="clock-display"></span>
+ <button class="btn btn-g" id="admin-btn" onclick="openLogin()">Admin Login</button>
+ <button class="btn btn-d" id="logout-btn" onclick="doLogout()" style="display:none;">Logout</button>
+ </div>
+</div>
+
+<!-- NAV -->
+<div id="nav">
+ <button class="nb active" data-tab="billing" onclick="gotoTab('billing',this)">BILLING</button>
+ <button class="nb" data-tab="orders" onclick="gotoTab('orders',this)" style="position:relative;">ONLINE ORDERS<span id="orders-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-family:var(--mono);">0</span></button>
+ <button class="nb admin-only" data-tab="dashboard" onclick="gotoTab('dashboard',this)">DASHBOARD</button>
+ <button class="nb admin-only" data-tab="menu" onclick="gotoTab('menu',this)">MENU</button>
+ <button class="nb admin-only" data-tab="raw" onclick="gotoTab('raw',this)">RAW MATERIALS</button>
+ <button class="nb admin-only" data-tab="stock" onclick="gotoTab('stock',this)">STOCK</button>
+ <button class="nb admin-only" data-tab="history" onclick="gotoTab('history',this)">SALES HISTORY</button>
+ <button class="nb admin-only" data-tab="expenses" onclick="gotoTab('expenses',this)">EXPENSES</button>
+ <button class="nb admin-only" data-tab="staff" onclick="gotoTab('staff',this)">STAFF & SALARY</button>
+ <button class="nb admin-only" data-tab="report" onclick="gotoTab('report',this)">REPORTS</button>
+ <button class="nb admin-only" data-tab="settings" onclick="gotoTab('settings',this)">SETTINGS</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+<!-- ══════════════════════════════════════════════════
+ BILLING
+══════════════════════════════════════════════════ -->
+<div class="tab active" id="tab-billing">
+ <div id="bl">
+ <!-- Menu -->
+ <div id="mp">
+ <div style="display:flex;gap:8px;margin-bottom:11px;">
+ <input id="msearch" placeholder="Search menu items…" oninput="renderGrid()" style="flex:1;">
+ <div style="font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center;white-space:nowrap;" id="bill-counter-display"></div>
+ </div>
+ <div class="cflt" id="catflt"></div>
+ <div class="mgrid" id="mgrid"></div>
+ </div>
+ <!-- Cart -->
+ <div id="cp">
+ <div class="card">
+ <div class="ct">CURRENT ORDER</div>
+ <div id="online-order-flag" style="display:none;margin-bottom:8px;background:#eef5ed;border:1px solid var(--green);border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;color:var(--green);">Loaded from Online Order</div>
+ <div id="online-order-notes" style="display:none;margin-bottom:8px;background:#fff8e8;border:1px solid #d8b860;border-radius:5px;padding:6px 10px;font-size:11px;color:#7a5a10;"></div>
+ <div style="display:flex;gap:6px;margin-bottom:8px;">
+ <input id="c-cust" placeholder="Customer name" style="flex:1;">
+ <input id="c-table" placeholder="Table #" style="width:70px;">
+ </div>
+ <div class="pms" id="pms">
+ <button class="pmb active" data-pay="Cash" onclick="setPay(this)">CASH</button>
+ <button class="pmb" data-pay="Card" onclick="setPay(this)">CARD</button>
+ <button class="pmb" data-pay="UPI" onclick="setPay(this)">UPI</button>
+ <button class="pmb" data-pay="PhonePe" onclick="setPay(this)" id="pmb-phonepe" style="display:none;background:#5F259F;border-color:#5F259F;color:#fff;"></button>
+ <button class="pmb" data-pay="Online" onclick="setPay(this)">OTHER</button>
+ </div>
+ <div id="ce">Tap menu items to add to order</div>
+ <div id="citems" style="display:none;"></div>
+ <div id="csum" class="csum" style="display:none;">
+ <div class="srow"><span class="muted">Subtotal</span><span id="ss">₹0.00</span></div>
+ <div class="srow" id="cgst-row" style="display:none;"><span class="muted" id="cgst-lbl">CGST</span><span id="cgst-v">₹0.00</span></div>
+ <div class="srow" id="sgst-row" style="display:none;"><span class="muted" id="sgst-lbl">SGST</span><span id="sgst-v">₹0.00</span></div>
+ <div class="srow" id="disc-row" style="display:none;color:var(--green);"><span>Discount</span><span id="disc-v">-₹0.00</span></div>
+ <div class="srow tot"><span>TOTAL</span><span id="stot">₹0.00</span></div>
+ </div>
+ <div style="display:flex;gap:6px;margin-top:10px;margin-bottom:10px;align-items:center;">
+ <span style="font-size:11px;color:var(--muted);">Discount:</span>
+ <input id="disc-inp" type="number" min="0" max="100" value="0" style="width:55px;" oninput="renderCart()">
+ <span class="pmb active" id="disc-type" onclick="toggleDiscType()" style="padding:4px 7px;font-size:10px;cursor:pointer;min-width:30px;text-align:center;">%</span>
+ </div>
+ <!-- QR status (read-only — upload via Admin >Settings) -->
+ <div id="billing-qr-badge" style="display:none;margin-bottom:10px;background:#edf5f0;border:1px solid #4a7c59;border-radius:5px;padding:7px 10px;align-items:center;gap:8px;">
+ <img id="billing-qr-thumb" style="width:34px;height:34px;border-radius:3px;object-fit:cover;" alt="QR">
+ <div>
+ <div style="font-size:10px;color:var(--green);font-weight:700;">UPI QR Active</div>
+ <div style="font-size:9px;color:var(--dim);">Prints on every customer bill</div>
+ </div>
+ </div>
+ <button class="btn btn-g btn-f" id="gbtn" onclick="generateBill()" disabled style="padding:11px;font-size:13px;letter-spacing:1px;">GENERATE BILL</button>
+ <div style="display:flex;gap:6px;margin-top:6px;">
+ <button class="btn btn-d btn-f btn-sm" onclick="clearCart()">Clear Cart</button>
+ <button class="btn btn-b btn-f btn-sm" id="kot-only-btn" onclick="printKOTOnly()" disabled>KOT Only</button>
+ </div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ ONLINE ORDERS (from QR customer menu)
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-orders">
+ <div class="card" style="margin-bottom:14px;">
+ <div class="ct">ONLINE ORDERS — Live from QR Menu</div>
+ <div style="font-size:11px;color:var(--muted);margin-top:4px;">Orders placed by customers on the QR menu appear here instantly. Review, then <b>Accept</b> to load into the cart for billing — or <b>Reject</b> if an item is unavailable.
+ </div>
+ <div id="orders-conn-status" style="margin-top:8px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.5px;padding:6px 10px;border-radius:5px;background:rgba(180,130,0,.15);color:#a07000;">Connecting to cloud…</div>
+ </div>
+ <div id="orders-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+ <div id="orders-empty" style="text-align:center;color:var(--dim);font-size:12px;padding:30px;">No online orders yet.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ DASHBOARD
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-dashboard">
+ <div class="sh">Dashboard Overview</div>
+ <div class="sgrid" id="dash-stats"></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-wrap:wrap;">
+ <div class="card">
+ <div class="ct">RECENT BILLS</div>
+ <div id="dash-recent"></div>
+ </div>
+ <div class="card">
+ <div class="ct">TODAY'S TOP ITEMS</div>
+ <div id="dash-top"></div>
+ </div>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ MENU
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-menu">
+ <div class="sh">Menu Management</div>
+ <div class="card" style="margin-bottom:14px;">
+ <div class="ct" id="mft">ADD MENU ITEM</div>
+ <div class="frow">
+ <div class="fg"><label>ITEM NAME *</label><input id="mf-name" placeholder="e.g. Masala Dosa" style="width:155px;"></div>
+ <div class="fg"><label>CATEGORY *</label><input id="mf-cat" placeholder="e.g. Main Course" style="width:125px;"></div>
+ <div class="fg"><label>PRICE (₹) *</label><input id="mf-price" type="number" min="0" step="0.5" placeholder="0.00" style="width:85px;"></div>
+ <div class="fg"><label>SHORT CODE</label><input id="mf-code" placeholder="e.g. VB" style="width:65px;"></div>
+ <div class="fg" style="justify-content:flex-end;padding-bottom:1px;">
+ <label class="check-label"><input type="checkbox" id="mf-gst" checked>GST Applicable</label>
+ <label class="check-label" style="margin-top:4px;"><input type="checkbox" id="mf-avail" checked>Available</label>
+ </div>
+ <div class="fg"><label>DAILY LIMIT <span style="font-weight:400;color:var(--dim);">(0 = unlimited)</span></label><input id="mf-dlimit" type="number" min="0" step="1" placeholder="e.g. 100" value="0" style="width:90px;"></div>
+ <div class="fg" style="flex-direction:row;gap:6px;align-items:flex-end;">
+ <button class="btn btn-g" onclick="saveMenu()">Save</button>
+ <button class="btn btn-d" id="mf-cancel" onclick="cancelMenuEdit()" style="display:none;">Cancel</button>
+ </div>
+ </div>
+ </div>
+ <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+ <input id="mts" placeholder="Search menu…" oninput="renderMenuTable()" style="flex:1;min-width:180px;max-width:280px;">
+ <span style="font-family:var(--mono);font-size:11px;color:var(--muted);" id="menu-count"></span>
+ </div>
+ <div class="tw">
+ <table><thead><tr><th>CODE</th><th>ITEM NAME</th><th>CATEGORY</th><th>PRICE</th><th>GST</th><th>AVAILABLE</th><th>DAILY LIMIT</th><th>RECIPE</th><th>ACTIONS</th></tr></thead>
+ <tbody id="mt-body"></tbody></table>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ RAW MATERIALS
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-raw">
+ <div class="sh">Raw Materials & Purchases</div>
+ <div class="card" style="margin-bottom:14px;">
+ <div class="ct" id="rft">ADD PURCHASE ENTRY</div>
+ <div class="frow">
+ <div class="fg"><label>MATERIAL NAME *</label><input id="rf-name" placeholder="e.g. Basmati Rice" style="width:148px;"></div>
+ <div class="fg"><label>CATEGORY</label><input id="rf-cat" placeholder="e.g. Grains" style="width:108px;"></div>
+ <div class="fg"><label>QTY *</label><input id="rf-qty" type="number" min="0" step="0.01" placeholder="0" style="width:75px;"></div>
+ <div class="fg"><label>UNIT</label>
+ <select id="rf-unit" style="width:75px;"><option>kg</option><option>g</option><option>L</option><option>ml</option><option>pcs</option><option>packets</option><option>boxes</option><option>bags</option><option>dozen</option><option>bottles</option></select>
+ </div>
+ <div class="fg"><label>PRICE/UNIT (₹) *</label><input id="rf-ppu" type="number" min="0" step="0.01" placeholder="0.00" style="width:98px;"></div>
+ <div class="fg"><label>SUPPLIER</label><input id="rf-supp" placeholder="Supplier name" style="width:118px;"></div>
+ <div class="fg"><label>INVOICE NO.</label><input id="rf-inv" placeholder="INV-001" style="width:90px;"></div>
+ <div class="fg"><label>DATE</label><input id="rf-date" type="date" style="width:128px;"></div>
+ <div class="fg"><label>NOTES</label><input id="rf-notes" placeholder="Optional notes" style="width:138px;"></div>
+ <div class="fg" style="flex-direction:row;gap:6px;align-items:flex-end;">
+ <button class="btn btn-g" onclick="saveRaw()">Save</button>
+ <button class="btn btn-d" id="rf-cancel" onclick="cancelRawEdit()" style="display:none;">Cancel</button>
+ </div>
+ </div>
+ </div>
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+ <input id="rts" placeholder="Search raw materials…" oninput="renderRawTable()" style="flex:1;min-width:180px;max-width:280px;">
+ <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red);">Total Invested: <span id="raw-total">₹0.00</span></div>
+ </div>
+ <div class="tw">
+ <table><thead><tr><th>NAME</th><th>CAT</th><th>QTY</th><th>UNIT</th><th>PRICE/UNIT</th><th>TOTAL COST</th><th>SUPPLIER</th><th>INVOICE</th><th>DATE</th><th>NOTES</th><th>ACTIONS</th></tr></thead>
+ <tbody id="rt-body"></tbody></table>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ STOCK
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-stock">
+ <div class="sh">Stock & Inventory Tally</div>
+ <div class="sgrid" id="stock-stats"></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-wrap:wrap;">
+ <div class="card">
+ <div class="ct">STOCK SUMMARY</div>
+ <div class="tw"><table><thead><tr><th>MATERIAL</th><th>TOTAL PURCHASED</th><th>UNIT</th><th>TOTAL COST</th></tr></thead><tbody id="st-body"></tbody></table></div>
+ </div>
+ <div class="card">
+ <div class="ct">FINANCIAL TALLY</div>
+ <div id="tally" style="font-family:var(--mono);font-size:12px;"></div>
+ </div>
+ </div>
+
+ <!-- ── SALES vs MATERIALS CONSUMED ── -->
+ <div class="card" style="margin-top:14px;">
+ <div class="ct" style="color:var(--blue);">SALES vs MATERIALS CONSUMED</div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.7;">Tracks how much raw material was consumed based on actual sales. Go to <b>Menu → Set Recipe</b> on each item to enable auto-tracking and auto-deduction.
+ </div>
+ <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+ <div class="fg"><label>FROM DATE</label><input type="date" id="cons-from" style="width:130px;" oninput="renderConsumptionPanel()"></div>
+ <div class="fg"><label>TO DATE</label><input type="date" id="cons-to" style="width:130px;" oninput="renderConsumptionPanel()"></div>
+ <div style="display:flex;gap:5px;flex-wrap:wrap;">
+ <button class="btn btn-d btn-sm" onclick="setConsRange('today')">Today</button>
+ <button class="btn btn-d btn-sm" onclick="setConsRange('week')">This Week</button>
+ <button class="btn btn-d btn-sm" onclick="setConsRange('month')">This Month</button>
+ <button class="btn btn-d btn-sm" onclick="$$('cons-from').value='';$$('cons-to').value='';renderConsumptionPanel()">All Time</button>
+ </div>
+ </div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-wrap:wrap;">
+ <div>
+ <div style="font-size:10px;font-family:var(--mono);font-weight:700;color:var(--blue);margin-bottom:8px;letter-spacing:.8px;">MATERIALS CONSUMED</div>
+ <div class="tw"><table><thead><tr><th>MATERIAL</th><th>CONSUMED</th><th>UNIT</th><th>CURRENT STOCK</th><th>STATUS</th></tr></thead><tbody id="cons-body"></tbody></table></div>
+ </div>
+ <div>
+ <div style="font-size:10px;font-family:var(--mono);font-weight:700;color:var(--gold);margin-bottom:8px;letter-spacing:.8px;">ITEMS SOLD & MATERIAL USAGE</div>
+ <div class="tw"><table><thead><tr><th>MENU ITEM</th><th>SOLD</th><th>INGREDIENTS USED</th></tr></thead><tbody id="cons-items-body"></tbody></table></div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ SALES HISTORY
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-history">
+ <div class="sh">Sales History</div>
+ <div style="display:flex;gap:8px;margin-bottom:13px;flex-wrap:wrap;align-items:center;">
+ <input type="date" id="hf-date" oninput="renderHistory()">
+ <input id="hf-search" placeholder="Search receipt / customer…" oninput="renderHistory()" style="width:220px;">
+ <select id="hf-pay" onchange="renderHistory()" style="width:100px;"><option value="">All Payment</option><option>Cash</option><option>Card</option><option>UPI</option><option>Online</option></select>
+ <button class="btn btn-d btn-sm" onclick="clearHistFilters()">Clear</button>
+ <div style="margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--gold);" id="hist-sum"></div>
+ </div>
+ <div class="tw">
+ <table><thead><tr><th>RECEIPT</th><th>CUSTOMER</th><th>TABLE</th><th>DATE</th><th>TIME</th><th>ITEMS</th><th>SUBTOTAL</th><th>DISC</th><th>GST</th><th>TOTAL</th><th>PAYMENT</th><th>ACTIONS</th></tr></thead>
+ <tbody id="ht-body"></tbody></table>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ EXPENSES
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-expenses">
+ <div class="sh">Shop Expenses</div>
+ <div class="card" style="margin-bottom:14px;">
+ <div class="ct" id="eft">ADD EXPENSE</div>
+ <div class="frow">
+ <div class="fg"><label>EXPENSE TYPE *</label>
+ <select id="ef-type" style="width:140px;">
+ <option>Electricity</option><option>Water</option><option>Gas/LPG</option>
+ <option>Rent</option><option>Internet</option><option>Maintenance</option>
+ <option>Packaging</option><option>Cleaning</option><option>Marketing</option>
+ <option>Equipment</option><option>Miscellaneous</option><option>Other</option>
+ </select>
+ </div>
+ <div class="fg"><label>DESCRIPTION</label><input id="ef-desc" placeholder="Bill no / details" style="width:148px;"></div>
+ <div class="fg"><label>AMOUNT (₹) *</label><input id="ef-amt" type="number" min="0" step="0.01" placeholder="0.00" style="width:108px;"></div>
+ <div class="fg"><label>PAYMENT MODE</label>
+ <select id="ef-pay" style="width:100px;"><option>Cash</option><option>Bank Transfer</option><option>UPI</option><option>Cheque</option></select>
+ </div>
+ <div class="fg"><label>DATE</label><input id="ef-date" type="date" style="width:128px;"></div>
+ <div class="fg"><label>RECEIPT/BILL</label><input id="ef-ref" placeholder="Ref number" style="width:110px;"></div>
+ <div class="fg" style="flex-direction:row;gap:6px;align-items:flex-end;">
+ <button class="btn btn-g" onclick="saveExpense()">Save</button>
+ <button class="btn btn-d" id="ef-cancel" onclick="cancelExpEdit()" style="display:none;">Cancel</button>
+ </div>
+ </div>
+ </div>
+ <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+ <input type="date" id="ef-filter-date" oninput="renderExpenses()">
+ <select id="ef-filter-type" onchange="renderExpenses()" style="width:140px;"><option value="">All Types</option><option>Electricity</option><option>Water</option><option>Gas/LPG</option><option>Rent</option><option>Internet</option><option>Maintenance</option><option>Packaging</option><option>Cleaning</option><option>Marketing</option><option>Equipment</option><option>Miscellaneous</option><option>Other</option></select>
+ <button class="btn btn-d btn-sm" onclick="document.getElementById('ef-filter-date').value='';document.getElementById('ef-filter-type').value='';renderExpenses();">Clear</button>
+ <div style="margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red);">Total: <span id="exp-total">₹0.00</span></div>
+ </div>
+ <div class="tw">
+ <table><thead><tr><th>TYPE</th><th>DESCRIPTION</th><th>AMOUNT</th><th>PAYMENT</th><th>DATE</th><th>REF</th><th>ACTIONS</th></tr></thead>
+ <tbody id="et-body"></tbody></table>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ STAFF & SALARY
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-staff">
+ <div class="sh">Staff & Salary Management</div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+ <!-- Add Staff -->
+ <div class="card">
+ <div class="ct" id="sft">STAFF MEMBER</div>
+ <div class="frow" style="flex-direction:column;gap:9px;">
+ <div class="fg"><label>FULL NAME *</label><input id="sf-name" placeholder="Employee name" style="width:100%;"></div>
+ <div style="display:flex;gap:8px;">
+ <div class="fg" style="flex:1;"><label>ROLE *</label>
+ <select id="sf-role" style="width:100%;"><option>Manager</option><option>Chef</option><option>Sous Chef</option><option>Waiter</option><option>Cashier</option><option>Cleaner</option><option>Delivery</option><option>Helper</option><option>Other</option></select>
+ </div>
+ <div class="fg" style="flex:1;"><label>SHIFT</label>
+ <select id="sf-shift" style="width:100%;"><option>Morning</option><option>Evening</option><option>Night</option><option>Full Day</option></select>
+ </div>
+ </div>
+ <div style="display:flex;gap:8px;">
+ <div class="fg" style="flex:1;"><label>MONTHLY SALARY (₹)</label><input id="sf-sal" type="number" min="0" placeholder="0.00" style="width:100%;"></div>
+ <div class="fg" style="flex:1;"><label>PHONE</label><input id="sf-ph" placeholder="9876543210" style="width:100%;"></div>
+ </div>
+ <div class="fg"><label>JOIN DATE</label><input id="sf-jdate" type="date" style="width:100%;"></div>
+ <div style="display:flex;gap:6px;">
+ <button class="btn btn-g" onclick="saveStaff()">Save Staff</button>
+ <button class="btn btn-d" id="sf-cancel" onclick="cancelStaffEdit()" style="display:none;">Cancel</button>
+ </div>
+ </div>
+ </div>
+ <!-- Staff List -->
+ <div class="card">
+ <div class="ct">STAFF LIST</div>
+ <div id="staff-list"></div>
+ </div>
+ </div>
+ <!-- Salary Payments -->
+ <div class="card" style="margin-bottom:14px;">
+ <div class="ct">SALARY PAYMENT LOG</div>
+ <div class="frow" style="margin-bottom:12px;">
+ <div class="fg"><label>STAFF MEMBER</label><select id="pay-staff" style="width:160px;"><option value="">Select Staff</option></select></div>
+ <div class="fg"><label>AMOUNT (₹)</label><input id="pay-amt" type="number" min="0" placeholder="0.00" style="width:100px;"></div>
+ <div class="fg"><label>MONTH</label><input id="pay-month" type="month" style="width:130px;"></div>
+ <div class="fg"><label>PAYMENT MODE</label><select id="pay-mode" style="width:110px;"><option>Cash</option><option>Bank Transfer</option><option>UPI</option><option>Cheque</option></select></div>
+ <div class="fg"><label>DATE</label><input id="pay-date" type="date" style="width:128px;"></div>
+ <div class="fg"><label>NOTES</label><input id="pay-notes" placeholder="Advance / bonus etc." style="width:138px;"></div>
+ <div class="fg" style="align-items:flex-end;"><button class="btn btn-g" onclick="saveSalaryPayment()">Record Payment</button></div>
+ </div>
+ <div class="tw">
+ <table><thead><tr><th>STAFF</th><th>ROLE</th><th>MONTH</th><th>AMOUNT</th><th>MODE</th><th>DATE</th><th>NOTES</th><th>ACTIONS</th></tr></thead>
+ <tbody id="salary-body"></tbody></table>
+ </div>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ DAILY REPORT
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-report">
+ <div style="display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:14px;flex-wrap:wrap;align-items:center;">
+ <button class="btn btn-g" id="rpt-tab-daily" onclick="switchReportTab('daily')">Daily Report</button>
+ <button class="btn btn-d" id="rpt-tab-monthly" onclick="switchReportTab('monthly')">Monthly Report</button>
+ <div style="margin-left:auto;"><button class="btn btn-g no-print" onclick="printReport()">Print Report</button></div>
+ </div>
+ <div id="rpt-daily-panel">
+ <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+ <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gold);">SELECT DATE</div>
+ <input type="date" id="rpt-date" oninput="renderReport()">
+ </div>
+ <div id="report-block"></div>
+ </div>
+ <div id="rpt-monthly-panel" style="display:none;">
+ <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+ <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gold);">SELECT MONTH</div>
+ <input type="month" id="rpt-month" oninput="renderMonthlyReport()">
+ </div>
+ <div id="monthly-report-block"></div>
+ </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+ SETTINGS
+══════════════════════════════════════════════════ -->
+<div class="tab" id="tab-settings">
+ <div class="sh">Settings</div>
+
+ <!-- ── ROW 1: Main settings — Shop Details + GST/Printer/QR ── -->
+ <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px;margin-bottom:14px;align-items:stretch;">
+
+ <!-- LEFT: Shop Details + Logo -->
+ <div style="display:flex;flex-direction:column;">
+ <div class="card" style="flex:1;display:flex;flex-direction:column;margin-bottom:0;">
+ <div class="ct">SHOP DETAILS</div>
+ <div style="flex:1;">
+ <div class="fg" style="margin-bottom:9px;"><label>SHOP NAME</label><input id="s-name" style="width:100%;"></div>
+ <div class="fg" style="margin-bottom:9px;"><label>TAGLINE</label><input id="s-tag" placeholder="Fresh · Fast · Delicious" style="width:100%;"></div>
+ <div class="fg" style="margin-bottom:9px;"><label>ADDRESS LINE 1</label><input id="s-addr1" style="width:100%;"></div>
+ <div class="fg" style="margin-bottom:9px;"><label>ADDRESS LINE 2</label><input id="s-addr2" style="width:100%;"></div>
+ <div style="display:flex;gap:8px;margin-bottom:9px;">
+ <div class="fg" style="flex:1;"><label>CONTACT</label><input id="s-contact" style="width:100%;"></div>
+ <div class="fg" style="flex:1;"><label>EMAIL</label><input id="s-email" style="width:100%;"></div>
+ </div>
+ <div style="display:flex;gap:8px;margin-bottom:9px;">
+ <div class="fg" style="flex:1;"><label>GSTIN</label><input id="s-gstin" placeholder="Leave blank if not registered" style="width:100%;"></div>
+ <div class="fg" style="flex:1;"><label>FSSAI LICENSE NO.</label><input id="s-fssai" placeholder="Optional" style="width:100%;"></div>
+ </div>
+ <div class="fg" style="margin-bottom:12px;"><label>THANK YOU MESSAGE</label><textarea id="s-thanks" rows="2" style="width:100%;"></textarea></div>
+ <hr class="sep">
+ <div class="ct" style="margin-top:0;">CAFE LOGO</div>
+ <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Upload your cafe logo — it will appear in the top header bar. PNG, JPG, or SVG recommended.</div>
+ <!-- BUG FIX: only ONE display property — JS controls visibility -->
+ <div id="settings-logo-preview" style="display:none;align-items:center;gap:14px;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;">
+ <img id="settings-logo-img" style="width:60px;height:60px;border-radius:6px;object-fit:contain;border:1px solid var(--border2);" alt="Logo">
+ <div>
+ <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:4px;">Logo Saved</div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Showing in the header bar</div>
+ <button class="btn btn-r btn-sm" onclick="clearCafeLogo()">Remove Logo</button>
+ </div>
+ </div>
+ <div id="settings-logo-upload" style="border:2px dashed var(--border2);border-radius:6px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:12px;"
+ onclick="document.getElementById('logo-file-input').click()"
+ ondragover="event.preventDefault();this.style.borderColor='var(--brown-mid)'"
+ ondragleave="this.style.borderColor='var(--border2)'"
+ ondrop="handleLogoDrop(event)">
+ <div style="font-size:12px;color:var(--muted);">Click or drag your logo image here</div>
+ <div style="font-size:10px;color:var(--dim);">PNG · JPG · SVG supported</div>
+ </div>
+ </div>
+ <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+ <button class="btn btn-g btn-f" onclick="saveSettings()">Save Settings</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- RIGHT: GST + Printer + QR -->
+ <div style="display:flex;flex-direction:column;">
+ <div class="card" style="flex:1;display:flex;flex-direction:column;margin-bottom:0;">
+ <div class="ct">GST & BILLING</div>
+ <div style="flex:1;">
+ <label class="check-label" style="margin-bottom:10px;"><input type="checkbox" id="s-gsten" onchange="toggleGstF()">Enable GST on billing</label>
+ <div id="gst-fields">
+ <div style="display:flex;gap:8px;margin-bottom:9px;">
+ <div class="fg" style="flex:1;"><label>CGST %</label><input id="s-cgst" type="number" step="0.1" style="width:100%;"></div>
+ <div class="fg" style="flex:1;"><label>SGST %</label><input id="s-sgst" type="number" step="0.1" style="width:100%;"></div>
+ </div>
+ </div>
+ <hr class="sep">
+ <div class="ct" style="margin-top:2px;">PRINTER SETTINGS</div>
+ <div class="alert alert-warn" style="margin-bottom:10px;">Connect a USB/Bluetooth thermal printer (80mm). Use Chrome → Print → "Save as PDF" or select your thermal printer directly.</div>
+ <div class="fg" style="margin-bottom:9px;"><label>BILL COPIES (customer)</label>
+ <select id="s-copies" style="width:100%;"><option value="1">1 copy</option><option value="2" selected>2 copies</option><option value="3">3 copies</option></select>
+ </div>
+ <label class="check-label" style="margin-bottom:6px;"><input type="checkbox" id="s-kot" checked>Print KOT (Kitchen Order Ticket) automatically</label>
+ <label class="check-label" style="margin-bottom:12px;"><input type="checkbox" id="s-qrshow" checked>Show UPI QR on customer bill</label>
+ <hr class="sep" style="margin-bottom:12px;">
+ <div class="ct" style="margin-top:0;">UPI QR CODE</div>
+ <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Upload your UPI QR image once. It saves permanently and prints on every customer bill when the option above is enabled.</div>
+ <div class="fg" style="margin-bottom:10px;">
+ <label>YOUR UPI ID (for online order payments)</label>
+ <input id="s-upiid" placeholder="e.g. yourshop@ybl or 9876543210@upi" style="width:100%;">
+ <div style="font-size:9.5px;color:var(--dim);margin-top:3px;">Used to generate a fresh payment QR with the exact order amount when staff accepts an online order. Find this on your UPI app's profile/QR screen.</div>
+ </div>
+ <div id="qr-active-box" style="display:none;align-items:center;gap:14px;background:#edf5f0;border:1px solid #4a7c59;border-radius:6px;padding:12px;margin-bottom:10px;">
+ <img id="qr-img" style="width:90px;height:90px;border-radius:4px;object-fit:cover;border:1px solid var(--border2);" alt="QR">
+ <div>
+ <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:4px;">QR Code Saved</div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">This QR prints on every bill automatically</div>
+ <button class="btn btn-r btn-sm" onclick="clearQR()">Remove QR</button>
+ </div>
+ </div>
+ <div id="qr-upload-area" style="border:2px dashed var(--border2);border-radius:6px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:4px;"
+ onclick="$$('qr-file-input').click()"
+ ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+ ondragleave="this.style.borderColor='var(--border2)'"
+ ondrop="handleQRDrop(event)">
+ <div style="font-size:12px;color:var(--muted);margin-bottom:3px;">Click or drag &amp; drop your UPI QR image here</div>
+ <div style="font-size:10px;color:var(--dim);">PNG · JPG · JPEG supported</div>
+ <input type="file" id="qr-file-input" accept="image/*" onchange="uploadQR(this)" style="display:none;">
+ </div>
+ </div>
+
+ <!-- ── PhonePe Payment Gateway ── -->
+ <hr class="sep" style="margin:16px 0 12px;">
+ <div class="ct" style="margin-top:0;display:flex;align-items:center;gap:8px;">
+  <svg width="16" height="16" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#5F259F"/><path d="M15 16h6v8.5h5.5c5.2 0 8.5 2.8 8.5 7.5s-3.3 7.5-8.5 7.5H21v5h-6V16zm6 17h5c2.8 0 4.2-1.3 4.2-3.5s-1.4-3.3-4.2-3.3H21V33Z" fill="#fff"/></svg>
+  PHONEPE PAYMENT GATEWAY
+ </div>
+ <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.7;background:#f3eef8;border:1px solid #c9a8eb;border-radius:6px;padding:9px 11px;">
+  <b>Two modes available:</b><br>
+  <b style="color:#5F259F;">① UPI Deep Link (in-store, no backend needed)</b> — Set your PhonePe Business UPI ID below.
+  Works in-store immediately — customers tap to open PhonePe app and pay.<br>
+  <b style="color:#5F259F;">② PhonePe PG (online QR menu)</b> — Requires your own backend proxy server.
+  Get your <b>Merchant ID</b> &amp; <b>Salt Key</b> from <a href="https://developer.phonepe.com/" target="_blank" style="color:#5F259F;font-weight:700;">PhonePe Developer Portal</a>,
+  deploy the backend proxy (see integration guide), then paste the proxy URL below.
+ </div>
+ <label class="check-label" style="margin-bottom:12px;">
+  <input type="checkbox" id="s-ppen"> Enable PhonePe payment mode in billing panel
+ </label>
+ <div class="fg" style="margin-bottom:10px;">
+  <label>PhonePe Business UPI ID <span style="font-size:9px;color:var(--dim);">(for UPI deep link / in-store QR — no backend needed)</span></label>
+  <input id="s-ppupi" placeholder="e.g. yourshop@ybl (from PhonePe Business app)" style="width:100%;">
+ </div>
+ <div style="display:grid;grid-template-columns:1.6fr 0.8fr;gap:10px;margin-bottom:10px;">
+  <div class="fg" style="margin:0;">
+   <label>Merchant ID <span style="font-size:9px;color:var(--dim);">(for PG — from PhonePe Developer Portal)</span></label>
+   <input id="s-ppmid" placeholder="MERCHANTID123" style="width:100%;">
+  </div>
+  <div class="fg" style="margin:0;">
+   <label>Environment</label>
+   <select id="s-ppenv" style="width:100%;">
+    <option value="sandbox">Sandbox (Testing)</option>
+    <option value="production">Production (Live)</option>
+   </select>
+  </div>
+ </div>
+ <div class="fg" style="margin-bottom:10px;">
+  <label>Customer Menu URL (Redirect after payment) <span style="font-size:9px;color:var(--dim);">(your deployed customer-menu.html HTTPS URL — PhonePe redirects customers here after payment)</span></label>
+  <input id="s-ppredirect" placeholder="https://your-cafe.netlify.app" style="width:100%;">
+  <div style="font-size:9.5px;color:var(--dim);margin-top:3px;line-height:1.5;">Must be HTTPS. This is where PhonePe sends the customer's browser after they complete payment.</div>
+ </div>
+ <div class="fg" style="margin-bottom:10px;">
+  <label>Backend Proxy URL <span style="font-size:9px;color:var(--dim);">(your server endpoint — Salt Key stays on server, never here)</span></label>
+  <input id="s-ppproxy" placeholder="https://your-server.com/api/phonepe/pay" style="width:100%;">
+  <div style="font-size:9.5px;color:var(--dim);margin-top:3px;line-height:1.5;">Deploy a Node.js / PHP / Python function that receives {amount_paise, merchantTransactionId, env} and signs + forwards to PhonePe. Your Salt Key lives only on the server.</div>
+ </div>
+
+ <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+ <button class="btn btn-g btn-f" onclick="saveSettings()">Save Settings</button>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- ── ROW 2: Security + Backup & Restore ── -->
+ <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:14px;">
+ <!-- Security -->
+ <div class="card">
+ <div class="ct">ADMIN SECURITY</div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Change the admin password. You'll be logged out after saving.</div>
+ <div class="fg" style="margin-bottom:9px;"><label>NEW PASSWORD</label><input type="password" id="s-np" autocomplete="new-password" style="width:100%;"></div>
+ <div class="fg" style="margin-bottom:9px;"><label>CONFIRM PASSWORD</label><input type="password" id="s-cp" autocomplete="new-password" style="width:100%;"></div>
+ <div id="pm" style="font-size:11px;margin-bottom:8px;"></div>
+ <button class="btn btn-g" onclick="changePass()">Change Password</button>
+ </div>
+
+ <!-- Backup & Restore -->
+ <div class="card" style="border:1px solid #c0d4e0;" id="backup-card">
+ <div class="ct" style="color:var(--blue);">BACKUP &amp; RESTORE <span id="schema-ver-badge" style="font-size:9px;background:#e8f0f5;color:var(--blue);border:1px solid #c0d4e0;border-radius:10px;padding:2px 8px;margin-left:6px;font-weight:700;letter-spacing:1px;font-family:var(--mono);"></span></div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7;">Export all data as a <b style="color:var(--text);">.json</b> file. To move data to another device — download here, copy the file, then import on the other device.</div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+ <!-- Export panel -->
+ <div style="background:#e8f0f5;border:1px solid #c0d4e0;border-radius:6px;padding:13px;">
+ <div style="font-size:10px;font-family:var(--mono);color:var(--blue);font-weight:700;margin-bottom:6px;">EXPORT</div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Creates a complete snapshot of all records.</div>
+ <button class="btn btn-b btn-f" onclick="exportBackup()" style="background:var(--blue);color:#fff;border:none;font-size:11px;">Download Backup</button>
+ <div id="export-info" style="font-size:10px;color:var(--dim);font-family:var(--mono);margin-top:6px;min-height:14px;"></div>
+ </div>
+ <!-- Import panel -->
+ <div style="background:#edf5f0;border:1px solid #b0d4b8;border-radius:6px;padding:13px;">
+ <div style="font-size:10px;font-family:var(--mono);color:var(--green);font-weight:700;margin-bottom:6px;">IMPORT</div>
+ <div style="display:flex;gap:5px;margin-bottom:8px;">
+ <button class="pmb active" id="imp-mode-replace" onclick="setImportMode('replace',this)" style="flex:1;padding:5px 2px;font-size:10px;">Replace</button>
+ <button class="pmb" id="imp-mode-merge" onclick="setImportMode('merge',this)" style="flex:1;padding:5px 2px;font-size:10px;">Merge</button>
+ </div>
+ <div id="imp-mode-desc" style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.5;background:var(--beige-light);border-radius:4px;padding:6px 8px;"><b>Replace:</b> Wipes current data, loads backup.</div>
+ <div style="border:2px dashed #b0d4b8;border-radius:5px;padding:10px;text-align:center;cursor:pointer;transition:border-color .15s;"
+ onclick="$$('import-file-inp').click()"
+ ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+ ondragleave="this.style.borderColor='#b0d4b8'"
+ ondrop="handleImportDrop(event)"
+ id="import-drop-zone">
+ <div style="font-size:11px;color:var(--muted);">Click or drop .json file</div>
+ <input type="file" id="import-file-inp" accept=".json,application/json" onchange="importBackup(this)" style="display:none;">
+ </div>
+ <div id="import-status" style="margin-top:8px;font-size:11px;display:none;"></div>
+ <div id="rec-no-raw" style="display:none;"></div>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- ── ROW 3: Danger Zone — full width compact strip ── -->
+ <div class="card" style="border:1px solid #e0c0c0;background:linear-gradient(135deg,#fdf8f8 0%,#fff 100%);">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+ <div style="flex:1;min-width:260px;">
+ <div class="ct" style="color:var(--red);margin-bottom:6px;">DANGER ZONE — FACTORY RESET</div>
+ <div style="font-size:11px;color:var(--muted);line-height:1.7;">Permanently deletes <b style="color:var(--text);">ALL data</b> — bills, sales, menu, raw materials, staff, expenses, salary records, QR code and settings.
+ <span style="display:inline-block;margin-top:3px;color:var(--red);font-weight:700;">This cannot be undone. Export a backup first.</span>
+ </div>
+ </div>
+ <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
+ <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-align:right;">TYPE "RESET" TO CONFIRM</div>
+ <div style="display:flex;gap:8px;align-items:center;">
+ <input id="reset-confirm-inp" placeholder='RESET' style="width:130px;border-color:#e0c0c0;color:var(--red);letter-spacing:3px;text-transform:uppercase;text-align:center;font-weight:700;">
+ <button class="btn btn-r" onclick="factoryReset()" style="white-space:nowrap;padding:8px 14px;">Delete All Data</button>
+ </div>
+ </div>
+ </div>
+ </div>
+
+</div>
+
+</div><!-- /main -->
+
+<!-- ══════════════════════════════════════════════════════════
+ MODALS
+══════════════════════════════════════════════════════════ -->
+
+<!-- Login -->
+<div class="mo" id="mo-login">
+ <div class="mb" style="max-width:310px;text-align:center;">
+ <div style="font-size:17px;font-weight:700;color:var(--brown-mid);font-family:var(--mono);margin-bottom:3px;">ADMIN ACCESS</div>
+ <div style="font-size:11px;color:var(--dim);margin-bottom:18px;">Staff cannot access admin features</div>
+ <input type="password" id="lp" autocomplete="off" placeholder="Enter password" style="width:100%;text-align:center;margin-bottom:7px;font-size:14px;" onkeydown="if(event.key==='Enter')tryLogin()">
+ <div id="lerr" style="color:var(--red);font-size:11px;margin-bottom:7px;"></div>
+ <div style="display:flex;gap:8px;">
+ <button class="btn btn-d btn-f" onclick="closeModal('mo-login')">Cancel</button>
+ <button class="btn btn-g btn-f" onclick="tryLogin()">Login →</button>
+ </div>
+ </div>
+</div>
+
+<!-- Online Order — Collect UPI Payment Modal -->
+<div class="mo" id="mo-payment">
+ <div class="mb" style="max-width:340px;text-align:center;">
+ <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:700;letter-spacing:.6px;color:var(--gold2);font-family:var(--mono);margin-bottom:2px;">
+ <svg width="15" height="15" viewBox="0 0 48 48" style="flex-shrink:0;"><path d="M14 14h6l8 10 8-10h6L30 28v10h-6V28L14 14Z" fill="#097939"/></svg>ONLINE ORDER PAYMENT
+ </div>
+ <div id="pay-cust-line" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
+ <div id="pay-no-upi" style="display:none;font-size:12px;color:var(--red);background:#f7e8e7;border:1px solid var(--red);border-radius:6px;padding:10px;margin-bottom:12px;">No UPI ID saved yet. Add one in <b>Settings → UPI QR Code</b> to send a payment QR to the customer's device. You can still collect cash/card and continue.
+ </div>
+ <div id="pay-qr-box" style="display:none;background:#edf5f0;border:1px solid #4a7c59;border-radius:10px;padding:16px;margin-bottom:12px;">
+ <div style="width:42px;height:42px;margin:0 auto 8px;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.12);">
+ <svg width="26" height="26" viewBox="0 0 48 48"><path d="M14 14h6l8 10 8-10h6L30 28v10h-6V28L14 14Z" fill="#097939"/></svg>
+ </div>
+ <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:4px;">Payment QR sent to customer's screen</div>
+ <div style="font-family:var(--mono);font-weight:700;font-size:22px;color:var(--gold2);margin-bottom:4px;" id="pay-amount"></div>
+ <div style="font-size:10.5px;color:var(--muted);">The customer can scan the QR on their device to pay.</div>
+ </div>
+ <div style="font-size:10.5px;color:var(--dim);margin-bottom:14px;">Once you see the payment land in your UPI app / bank SMS, tap below to open the bill and KOT for printing.</div>
+ <div style="display:flex;gap:8px;">
+ <button class="btn btn-d btn-f" onclick="cancelOnlinePayment()">Cancel Order</button>
+ <button class="btn btn-g btn-f" onclick="confirmOnlinePaymentAndPrint()">Payment Received</button>
+ </div>
+ </div>
+</div>
+
+
+<!-- Bill Print Modal -->
+<div class="mo" id="mo-bill">
+ <div style="display:flex;border-radius:14px;overflow:hidden;box-shadow:0 28px 70px rgba(15,8,3,.6);max-width:950px;width:97vw;max-height:94vh;">
+
+ <!-- LEFT — Receipt preview area -->
+ <div style="flex:1;min-width:0;background:#f0e8dc;overflow-y:auto;padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;">
+ <!-- Status bar inside receipt area -->
+ <div id="bill-status-bar" class="no-print" style="width:100%;border-radius:7px;font-size:10px;font-family:var(--mono);font-weight:700;letter-spacing:.8px;transition:all .3s;flex-shrink:0;"></div>
+ <!-- Bills -->
+ <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;width:100%;align-items:flex-start;">
+ <div style="text-align:center;">
+ <div style="font-size:9px;font-family:var(--mono);color:#a08060;margin-bottom:5px;letter-spacing:2px;font-weight:700;">CUSTOMER COPY</div>
+ <div class="rp print-area" id="bill-customer"></div>
+ </div>
+ <div style="text-align:center;" id="kot-wrapper">
+ <div style="font-size:9px;font-family:var(--mono);color:#a08060;margin-bottom:5px;letter-spacing:2px;font-weight:700;">KITCHEN ORDER TICKET</div>
+ <div class="kot print-area" id="bill-kot"></div>
+ </div>
+ </div>
+ </div>
+
+ <!-- RIGHT — Action panel -->
+ <div id="ap-panel" class="no-print" style="width:248px;flex-shrink:0;background:#1a0d06;color:#fff;display:flex;flex-direction:column;padding:22px 18px;">
+
+ <!-- Top: header -->
+ <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);">
+ <div style="font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.35);letter-spacing:2px;margin-bottom:10px;">BILL ACTIONS</div>
+ <!-- Receipt summary card -->
+ <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:9px;padding:13px 14px;">
+ <div id="ap-receipt-no" style="font-family:var(--mono);font-size:9px;color:#d4a574;font-weight:700;letter-spacing:2px;margin-bottom:7px;"></div>
+ <div id="ap-total" style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1;margin-bottom:7px;"></div>
+ <div id="ap-info" style="font-size:10px;color:rgba(255,255,255,.45);line-height:1.7;font-family:var(--mono);white-space:pre-line;"></div>
+ </div>
+ </div>
+
+ <!-- PRIMARY: Print & Save -->
+ <button onclick="printBill('both')"
+ style="width:100%;padding:13px 10px;background:linear-gradient(135deg,#4a7c59,#3d6849);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:.2px;margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(74,124,89,.4);transition:all .15s;"
+ onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(74,124,89,.5)'"
+ onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(74,124,89,.4)'">
+ <span>Print &amp; Save</span>
+ </button>
+
+ <!-- SECONDARY: Individual copies -->
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:18px;">
+ <button onclick="printBill('customer')"
+ style="padding:9px 4px;background:rgba(255,255,255,.08);color:#e8d5c0;border:1px solid rgba(255,255,255,.12);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;"
+ onmouseover="this.style.background='rgba(255,255,255,.15)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">Customer
+ </button>
+ <button onclick="printBill('kot')"
+ style="padding:9px 4px;background:rgba(255,255,255,.08);color:#e8d5c0;border:1px solid rgba(255,255,255,.12);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;"
+ onmouseover="this.style.background='rgba(255,255,255,.15)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">KOT
+ </button>
+ </div>
+
+ <!-- Divider -->
+ <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+ <div style="flex:1;height:1px;background:rgba(255,255,255,.08);"></div>
+ <span style="font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.25);letter-spacing:1px;">OR</span>
+ <div style="flex:1;height:1px;background:rgba(255,255,255,.08);"></div>
+ </div>
+
+ <!-- Save without print -->
+ <button id="confirm-bill-btn" onclick="confirmBill()"
+ style="width:100%;padding:9px;background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.15);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;margin-bottom:8px;"
+ onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">Save (No Print)
+ </button>
+
+ <!-- Cancel -->
+ <button id="ap-cancel-btn" onclick="closeBillModal()"
+ style="width:100%;padding:9px;background:rgba(180,50,50,.12);color:#ff9090;border:1px solid rgba(180,50,50,.25);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;"
+ onmouseover="this.style.background='rgba(180,50,50,.22)'" onmouseout="this.style.background='rgba(180,50,50,.12)'">Cancel — Don't Save
+ </button>
+
+ <!-- Footer tip -->
+ <div id="ap-footer-tip" style="margin-top:auto;padding-top:18px;text-align:center;font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.2);line-height:1.9;letter-spacing:.6px;">CANCEL KEEPS CART UNCHANGED<br>TOKEN NUMBER NOT COMMITTED
+ </div>
+ </div>
+ </div>
+</div>
+
+<!-- Recipe Modal -->
+<div class="mo" id="mo-recipe">
+ <div class="mb" style="max-width:580px;max-height:90vh;overflow-y:auto;">
+ <div class="ct" style="color:var(--blue);">RECIPE — <span id="rec-item-name" style="color:var(--text);font-family:var(--sans);text-transform:none;letter-spacing:0;"></span></div>
+ <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7;background:var(--s2);border-radius:5px;padding:9px 12px;border:1px solid var(--border);">Set how much of each raw material is used when <b style="color:var(--text);">1 unit</b> of this item is sold.<br>Stock is <b style="color:var(--green);">automatically deducted</b> every time a bill containing this item is generated.
+ </div>
+ <div id="rec-rows" style="margin-bottom:10px;"></div>
+ <button class="btn btn-d btn-sm" onclick="addRecipeRow(null)" style="margin-bottom:4px;">+ Add Ingredient</button>
+ <div id="rec-no-raw" style="display:none;background:#faf3e0;border:1px solid #d4a500;border-radius:5px;padding:8px 12px;font-size:11px;color:#8b6914;margin-bottom:10px;">No raw materials found. Add materials in the <b>Raw Materials</b> tab first.
+ </div>
+ <div style="display:flex;gap:8px;margin-top:14px;">
+ <button class="btn btn-g btn-f" onclick="saveRecipe()">Save Recipe</button>
+ <button class="btn btn-d btn-f" onclick="closeModal('mo-recipe')">Cancel</button>
+ </div>
+ </div>
+</div>
+
+<!-- View Bill (history) -->
+<div class="mo" id="mo-viewbill">
+ <div style="text-align:center;">
+ <div class="rp print-area" id="vb-paper"></div>
+ <div style="display:flex;gap:8px;margin-top:10px;" class="no-print"><button class="btn btn-g" onclick="printViewBill()">Print</button><button class="btn btn-d" onclick="closeModal('mo-viewbill')">Close</button></div>
+ </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// FIREBASE — Online Orders (QR Customer Menu <-> BrewOps)
+// ════════════════════════════════════════════════════════════
+const firebaseConfig = {
+ apiKey:            "AIzaSyA8jrVeGCGycMNCIUr7mxkkUTcPFl_5JQs",
+ authDomain:        "brewops-17e41.firebaseapp.com",
+ projectId:         "brewops-17e41",
+ storageBucket:     "brewops-17e41.firebasestorage.app",
+ messagingSenderId: "1072049282522",
+ appId:             "1:1072049282522:web:1276f9fb523d5ccddaf4e3",
+ measurementId:     "G-DMG51DJ8QG"
+};
+let fbDb = null;
+let fbReady = false;
+let ordersUnsub = null;
+function fbInit(){
+ try{
+ if(firebaseConfig.apiKey.includes('PASTE_')){
+ console.warn('[CaféOS] Firebase not configured yet — Online Orders disabled. See SETUP-INSTRUCTIONS.md');
+ const st=$$('orders-conn-status');
+ if(st){st.style.background='rgba(184,84,80,.15)';st.style.color='var(--red)';st.textContent=' Firebase not configured — open SETUP-INSTRUCTIONS.md to connect your QR menu.';}
+ return;
+ }
+ const app=firebase.initializeApp(firebaseConfig);
+ fbDb=firebase.firestore();
+ fbReady=true;
+ listenForOnlineOrders();
+ syncMenuToCloud(); // push current menu/settings on startup
+ const st=$$('orders-conn-status');
+ if(st){st.style.background='rgba(74,124,89,.15)';st.style.color='var(--green)';st.textContent=' Connected — listening for online orders';}
+ }catch(err){
+ console.error('[CaféOS] Firebase init failed',err);
+ const st=$$('orders-conn-status');
+ if(st){st.style.background='rgba(184,84,80,.15)';st.style.color='var(--red)';st.textContent=' Firebase connection failed: '+err.message;}
+ }
+}
+
+// ── Push menu + display settings to the cloud (customer menu reads this) ──
+async function syncMenuToCloud(){
+ if(!fbReady)return;
+ try{
+ await fbDb.collection('meta').doc('menu').set({
+ items:S.menu, updatedAt:Date.now()
+ });
+ await fbDb.collection('meta').doc('settings').set({
+ shopName:S.settings.shopName, tagline:S.settings.tagline,
+ gstEnabled:S.settings.gstEnabled, cgst:S.settings.cgst, sgst:S.settings.sgst,
+ updatedAt:Date.now()
+ });
+ }catch(err){console.error('[CaféOS] Menu sync failed',err);}
+}
+
+// ── Listen for incoming online orders in real time ──
+function listenForOnlineOrders(){
+ if(!fbReady||ordersUnsub)return;
+ ordersUnsub=fbDb.collection('orders')
+ .where('status','==','pending')
+ .orderBy('createdAt','asc')
+ .onSnapshot(snap=>{
+ onlineOrders=snap.docs.map(d=>({_docId:d.id,...d.data()}));
+ renderOnlineOrders();
+ },err=>{
+ console.error('[CaféOS] Orders listener error',err);
+ const st=$$('orders-conn-status');
+ if(st){st.style.background='rgba(184,84,80,.15)';st.style.color='var(--red)';st.textContent=' Listener error: '+err.message;}
+ });
+}
+
+let onlineOrders=[];
+function renderOnlineOrders(){
+ const list=$$('orders-list'),empty=$$('orders-empty'),badge=$$('orders-badge');
+ if(!list)return;
+ if(badge){
+ if(onlineOrders.length>0){badge.style.display='inline-block';badge.textContent=onlineOrders.length;}
+ else badge.style.display='none';
+ }
+ if(!onlineOrders.length){list.innerHTML='';empty.style.display='block';return;}
+ empty.style.display='none';
+ list.innerHTML=onlineOrders.map(o=>{
+ const itemsHtml=(o.items||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;"><span>${i.qty}× ${esc(i.name)}</span><span class="muted">${fmt(i.price*i.qty)}</span></div>`).join('');
+ const est=(o.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+ const mins=o.createdAt?Math.max(0,Math.round((Date.now()-o.createdAt)/60000)):0;
+ const isAwaiting=_pendingPaymentDocId===o._docId;
+ const awaitingBadge=isAwaiting
+  ?`<div style="margin-top:8px;background:rgba(74,124,89,.12);border:1px solid var(--green);border-radius:6px;padding:7px 11px;font-size:11px;color:var(--green);font-weight:700;font-family:var(--mono);display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 1.2s ease-in-out infinite;flex-shrink:0;"></span>Awaiting payment from customer… Bill will print automatically.</div>`
+  :'';
+ const actions=isAwaiting
+  ?`<button class="btn btn-d btn-sm" onclick="rejectOnlineOrder('${o._docId}')" style="margin-top:8px;">Cancel Order</button>`
+  :`<div style="display:flex;gap:6px;margin-top:10px;">
+  <button class="btn btn-g btn-f" onclick="acceptOrder('${o._docId}')">Accept Order</button>
+  <button class="btn btn-d" onclick="rejectOnlineOrder('${o._docId}')">Reject</button>
+  </div>`;
+ return `<div class="card" style="border-left:4px solid ${isAwaiting?'var(--green)':'var(--gold)'};">
+ <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+ <div>
+ <div style="font-weight:700;font-size:14px;">${esc(o.customerName||'Guest')} <span class="muted" style="font-size:11px;font-weight:400;">· ${esc(o.mobile||'—')}</span></div>
+ <div style="font-size:11px;color:var(--muted);margin-top:2px;">${o.table?('Table '+esc(o.table)+' · '):''}${mins} min ago</div>
+ </div>
+ <div style="font-family:var(--mono);font-weight:700;color:var(--gold);">${fmt(est)}</div>
+ </div>
+ <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px;">${itemsHtml}</div>
+ ${o.notes?`<div style="margin-top:6px;font-size:11px;color:var(--muted);font-style:italic;">Note: ${esc(o.notes)}</div>`:''}
+ ${awaitingBadge}
+ ${actions}
+ </div>`;
+ }).join('');
+}
+
+let _activeOnlineOrderId=null;
+let _activeOnlineOrderNotes='';
+let _pendingPaymentDocId=null;  // order we're waiting on payment for
+let _paymentListener=null;       // Firestore unsub handle
+let _pendingBillHtml=null;       // saved bill HTML for auto-print
+let _pendingKotHtml=null;        // saved KOT HTML for auto-print
+
+// ── Accept online order → build & save bill → wait for payment → auto-print ──
+async function acceptOrder(docId){
+ const o=onlineOrders.find(x=>x._docId===docId);
+ if(!o)return;
+ // Map items to live menu records
+ cart=[];
+ const missing=[];
+ (o.items||[]).forEach(oi=>{
+  const mi=S.menu.find(m=>m.id===oi.id)||S.menu.find(m=>m.name===oi.name);
+  if(mi) cart.push({...mi,qty:oi.qty});
+  else missing.push(oi.name);
+ });
+ if(missing.length) alert('Items no longer on menu (skipped):\n'+missing.join(', '));
+ if(!cart.length){cart=[];return;}
+ // Fill billing fields
+ $$('c-cust').value=o.customerName||'Online';
+ $$('c-table').value=o.table||'';
+ $$('disc-inp').value='0';
+ // Choose pay mode
+ const ppActive=S.settings.ppEnabled&&(S.settings.ppUpiId||S.settings.ppMerchantId);
+ payMode=ppActive?'PhonePe':(S.settings.upiId?'UPI':'Cash');
+ document.querySelectorAll('.pmb').forEach(b=>b.classList.remove('active'));
+ const pb=document.querySelector(`.pmb[data-pay="${payMode}"]`);
+ if(pb)pb.classList.add('active');
+ _activeOnlineOrderId=docId;
+ _activeOnlineOrderNotes=o.notes||'';
+ // Build bill preview
+ const ok=await buildPendingBill();
+ if(!ok){clearCart();return;}
+ const billTotal=_pendingBill.total;
+ // Save bill HTML now — we'll use it to auto-print once payment is confirmed
+ _pendingBillHtml=buildBillHTML(_pendingBill);
+ _pendingKotHtml=S.settings.printKOT?buildKOTHTML(_pendingBill):null;
+ // Build UPI payment URLs
+ const upiVpa=(ppActive&&S.settings.ppUpiId)?S.settings.ppUpiId:(S.settings.upiId||'').trim();
+ let custQrUrl='',custPayUrl='';
+ if(upiVpa&&billTotal>0){
+  const _pn=encodeURIComponent(S.settings.shopName||'Cafe');
+  const _tn=encodeURIComponent('Order '+(o.customerName||''));
+  custPayUrl=`upi://pay?pa=${encodeURIComponent(upiVpa)}&pn=${_pn}&am=${billTotal.toFixed(2)}&cu=INR&tn=${_tn}`;
+  custQrUrl='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data='+encodeURIComponent(custPayUrl);
+ }
+ // PhonePe PG link (non-blocking)
+ let phonePeUrl='';
+ if(S.settings.ppEnabled&&S.settings.ppMerchantId&&S.settings.ppProxyUrl){
+  const pgRes=await initiatePhonePePG(billTotal,o.mobile,docId);
+  if(pgRes.ok) phonePeUrl=pgRes.url;
+ }
+ // Save bill to IndexedDB — suppress Firestore 'billed' update (payment not confirmed yet)
+ const savedDocId=_activeOnlineOrderId;
+ _activeOnlineOrderId=null; // prevent markOnlineOrderBilled() firing inside confirmBill()
+ await confirmBill();
+ _activeOnlineOrderId=savedDocId;
+ // Push confirmed status + payment URLs + prep time to customer's device
+ if(fbReady){
+  try{
+   await fbDb.collection('orders').doc(docId).update({
+    status:'confirmed',
+    confirmedAt:Date.now(),
+    upiQrUrl:custQrUrl,
+    upiPayUrl:custPayUrl,
+    phonePeUrl:phonePeUrl,
+    orderTotal:billTotal,
+    prepTime:'15-20 minutes'
+   });
+  }catch(err){console.error('[BrewOps] Order update failed',err);}
+ }
+ // Mark as awaiting payment and re-render order card
+ _pendingPaymentDocId=docId;
+ renderOnlineOrders();
+ // Start Firestore listener — auto-print when webhook confirms payment
+ _startPaymentListener(docId,o.customerName||'Customer',billTotal);
+}
+
+function _startPaymentListener(docId,customerName,billTotal){
+ if(_paymentListener){_paymentListener();_paymentListener=null;}
+ if(!fbReady){
+  // Fallback: if no Firebase, auto-print after 3s (cash/UPI in-store)
+  setTimeout(()=>_autoPrintBill(customerName,billTotal),3000);
+  return;
+ }
+ _paymentListener=fbDb.collection('orders').doc(docId).onSnapshot(snap=>{
+  if(!snap.exists)return;
+  const d=snap.data();
+  if(d.status==='billed'){
+   // Payment confirmed by webhook → stop listening → print
+   _paymentListener();_paymentListener=null;
+   _pendingPaymentDocId=null;
+   renderOnlineOrders();
+   _autoPrintBill(customerName,d.total||billTotal);
+  }
+ },err=>console.error('[BrewOps] Payment listener error',err));
+}
+
+function _autoPrintBill(customerName,amount){
+ // Show staff toast notification
+ _showPaymentToast(customerName,amount);
+ // Auto-open print window with saved bill HTML
+ if(!_pendingBillHtml)return;
+ let body=`<div style="width:80mm;padding:16px 14px;">${_pendingBillHtml}</div>`;
+ if(_pendingKotHtml) body+=`<div style="page-break-after:always;"></div><div style="width:80mm;padding:18px 20px;border:2px dashed #8b5e3c;">${_pendingKotHtml}</div>`;
+ _openPrintWin(body);
+ _pendingBillHtml=null;
+ _pendingKotHtml=null;
+}
+
+function _showPaymentToast(customerName,amount){
+ const old=document.getElementById('_pp-toast');if(old)old.remove();
+ const t=document.createElement('div');
+ t.id='_pp-toast';
+ t.style.cssText='position:fixed;top:68px;right:16px;z-index:9999;background:#132d1e;color:#6ee7a0;border:1.5px solid #2d6a48;border-radius:12px;padding:14px 18px;font-family:var(--mono);font-size:12px;box-shadow:0 6px 28px rgba(0,0,0,.45);max-width:290px;line-height:1.55;animation:_toastIn .25s ease;';
+ t.innerHTML=`<div style="font-size:14px;font-weight:700;margin-bottom:4px;"> Payment Confirmed!</div>
+  <div style="font-size:11.5px;opacity:.85;">${esc(customerName)} · ${fmt(amount)}</div>
+  <div style="font-size:11px;opacity:.7;margin-top:3px;">Bill printed automatically.</div>
+  <div onclick="this.closest('#_pp-toast').remove()" style="position:absolute;top:8px;right:10px;cursor:pointer;font-size:15px;opacity:.5;"> ×</div>`;
+ document.body.appendChild(t);
+ setTimeout(()=>{if(t.parentNode)t.remove();},7000);
+}
+
+
+function openPaymentCollection(o){
+ const {total}=calcCart();
+ $$('pay-cust-line').textContent=(o.customerName||'Guest')+' · '+(o.mobile||'—')+(o.table?(' · Table '+o.table):'');
+ $$('pay-amount').textContent=fmt(total);
+ const upiId=(S.settings.upiId||'').trim();
+ // QR is now displayed on the customer's device — staff just sees the confirmation card
+ if(upiId&&total>0){
+ $$('pay-no-upi').style.display='none';
+ $$('pay-qr-box').style.display='block';
+ }else{
+ $$('pay-no-upi').style.display='block';
+ $$('pay-qr-box').style.display='none';
+ }
+ openModal('mo-payment');
+}
+
+function cancelOnlinePayment(){
+ closeModal('mo-payment');
+ if(confirm('Discard this order from the cart? (The online order will be marked rejected.)')){
+ if(_activeOnlineOrderId&&fbReady){
+ fbDb.collection('orders').doc(_activeOnlineOrderId).update({status:'rejected',rejectedAt:Date.now()}).catch(err=>console.error(err));
+ }
+ clearCart();
+ }
+}
+
+async function confirmOnlinePaymentAndPrint(){
+ closeModal('mo-payment');
+ const ok=await buildPendingBill();
+ if(!ok)return;
+ // Auto-save immediately — payment is already confirmed, no extra confirmation needed
+ await confirmBill();
+ openModal('mo-bill');
+ // Print-only mode: hide "Save (No Print)" since bill is already in the DB
+ const confirmBtn=$$('confirm-bill-btn');
+ if(confirmBtn) confirmBtn.style.display='none';
+ // Update footer tip
+ const footerEl=$$('ap-footer-tip');
+ if(footerEl) footerEl.textContent='BILL SAVED · PRINT & CLOSE';
+}
+
+async function rejectOnlineOrder(docId){
+ if(!confirm('Reject this order? The customer will see it was declined.'))return;
+ try{
+ await fbDb.collection('orders').doc(docId).update({status:'rejected',rejectedAt:Date.now()});
+ }catch(err){console.error('[CaféOS] Could not reject order',err);alert('Could not reject order — check connection.');}
+}
+
+// Called from confirmBill()/printBill() once a bill tied to an online order is saved
+async function markOnlineOrderBilled(receiptNo,total){
+ if(!_activeOnlineOrderId||!fbReady)return;
+ try{
+ await fbDb.collection('orders').doc(_activeOnlineOrderId).update({status:'billed',receiptNo,total,billedAt:Date.now()});
+ }catch(err){console.error('[CaféOS] Could not mark order billed',err);}
+ _activeOnlineOrderId=null;
+ _activeOnlineOrderNotes='';
+}
+
+</script>
+<script>const DB_NAME = 'BrewOps', DB_VER = 1, DB_STORE = 'data';
+// Bump this whenever a future upgrade changes data structure
+const SCHEMA_VERSION = 6;
+let db = null;
+
+function openDB() {
+ return new Promise((res, rej) => {
+ const req = indexedDB.open(DB_NAME, DB_VER);
+ req.onupgradeneeded = e => {
+ const d = e.target.result;
+ if (!d.objectStoreNames.contains(DB_STORE)) d.createObjectStore(DB_STORE);
+ };
+ req.onsuccess = e => { db = e.target.result; res(db); };
+ req.onerror = () =>rej(req.error);
+ });
+}
+
+async function dbSet(key, val) {
+ try {
+ const tx = db.transaction(DB_STORE, 'readwrite');
+ tx.objectStore(DB_STORE).put(val, key);
+ await new Promise((r,j) => { tx.oncomplete=r; tx.onerror=j; });
+ } catch {
+ try { localStorage.setItem('cafeos_'+key, JSON.stringify(val)); } catch {}
+ }
+}
+
+async function dbGet(key, def) {
+ try {
+ const tx = db.transaction(DB_STORE, 'readonly');
+ const req = tx.objectStore(DB_STORE).get(key);
+ const val = await new Promise((r,j) => { req.onsuccess=()=>r(req.result); req.onerror=j; });
+ if (val !== undefined) return val;
+ } catch {}
+ // fallback localStorage
+ try {
+ const v = localStorage.getItem('cafeos_'+key);
+ if (v) return JSON.parse(v);
+ } catch {}
+ return def;
+}
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let S = {
+ menu:[], raw:[], sales:[], expenses:[], staff:[], salaryPayments:[],
+ dailyStock:{},
+ settings:{
+ shopName:'My Café', tagline:'', addr1:'', addr2:'',
+ contact:'', email:'', gstin:'', fssai:'',
+ thanks:'Thank you for visiting! Please come again.',
+ gstEnabled:true, cgst:2.5, sgst:2.5,
+ printCopies:2, printKOT:true, showQR:true, upiId:'',
+ ppUpiId:'', ppMerchantId:'', ppProxyUrl:'', ppRedirectUrl:'', ppEnv:'sandbox', ppEnabled:false
+ },
+ pass:'admin123', isAdmin:false,
+ qrData:null
+};
+
+async function loadAll() {
+ S.menu = await dbGet('menu', defaultMenu());
+ S.raw = await dbGet('raw', []);
+ S.sales = await dbGet('sales', []);
+ S.expenses = await dbGet('expenses', []);
+ S.staff = await dbGet('staff', []);
+ S.salaryPayments = await dbGet('salaryPayments', []);
+ S.settings = await dbGet('settings', S.settings);
+ S.pass = await dbGet('pass', 'admin123');
+ S.qrData = await dbGet('qrData', null);
+ S.dailyStock = await dbGet('dailyStock', {});
+ const logoData = await dbGet('cafeLogoData', null);
+ if(logoData) applyCafeLogo(logoData);
+}
+
+async function persist(key) {
+ await dbSet(key, S[key]);
+}
+
+// ════════════════════════════════════════════════════════════
+// SCHEMA MIGRATION SYSTEM
+// ════════════════════════════════════════════════════════════
+// HOW TO ADD A NEW VERSION:
+// 1. Bump SCHEMA_VERSION at the top (e.g. 2 → 3)
+// 2. Add a migrations[3] = (d) => { ...patch d... ; return d; } below
+// 3. The system auto-runs it on startup AND on every import
+//
+// Each function receives the full data object { menu, sales, raw, … }
+// and must return it (modified or not). Use spread defaults so old
+// records missing new fields get safe values without losing any data.
+
+const migrations = {
+
+ // v1 → v2 : First migration — normalize all records to guarantee
+ // required fields exist. Safe to run on already-clean data.
+ 2: (d) => {
+ if (Array.isArray(d.menu)) {
+ d.menu = d.menu.map(m => ({
+ available: true, gst: true, code: '', ...m
+ }));
+ }
+ if (Array.isArray(d.sales)) {
+ d.sales = d.sales.map(s => ({
+ discount: 0, discountType: '%', customer: '',
+ table: '', invoiceNo: '', ...s
+ }));
+ }
+ if (Array.isArray(d.raw)) {
+ d.raw = d.raw.map(r => ({
+ minStock: 0, purchased: 0, purchasedCost: 0, ...r
+ }));
+ }
+ if (Array.isArray(d.expenses)) {
+ d.expenses = d.expenses.map(e => ({
+ category: 'General', desc: '', ...e
+ }));
+ }
+ if (Array.isArray(d.staff)) {
+ d.staff = d.staff.map(s => ({
+ phone: '', joined: '', ...s
+ }));
+ }
+ if (Array.isArray(d.salaryPayments)) {
+ d.salaryPayments = d.salaryPayments.map(p => ({
+ note: '', ...p
+ }));
+ }
+ if (d.settings) {
+ d.settings = {
+ gstEnabled: true, cgst: 2.5, sgst: 2.5,
+ printCopies: 2, printKOT: true, showQR: true,
+ thanks: 'Thank you for visiting! Please come again.',
+ ...d.settings
+ };
+ }
+ return d;
+ },
+
+ // Future example — uncomment & fill when you add new features:
+ // 4: (d) => { ... return d; },
+
+ // v2 → v3: Add recipe[] to all menu items, materialsUsed[] to all sales
+ 3: (d) => {
+ if (Array.isArray(d.menu)) {
+ d.menu = d.menu.map(m => ({ recipe: [], ...m }));
+ }
+ if (Array.isArray(d.sales)) {
+ d.sales = d.sales.map(s => ({ materialsUsed: [], ...s }));
+ }
+ return d;
+ },
+
+ // v3 → v4: Add dailyLimit:0 to all menu items
+ 4: (d) => {
+ if (Array.isArray(d.menu)) {
+ d.menu = d.menu.map(m => ({ dailyLimit: 0, ...m }));
+ }
+ return d;
+ },
+
+ // v4 → v5: Add upiId to settings (UPI payment QR for online orders)
+ 5: (d) => {
+ if (d.settings) {
+ d.settings = { upiId: '', ...d.settings };
+ }
+ return d;
+ },
+
+ // v5 → v6: Add PhonePe Payment Gateway settings
+ 6: (d) => {
+ if (d.settings) {
+  d.settings = { ppUpiId:'', ppMerchantId:'', ppProxyUrl:'', ppRedirectUrl:'', ppEnv:'sandbox', ppEnabled:false, ...d.settings };
+  // Remove old fields if they exist (salt key must not persist)
+  delete d.settings.ppSaltKey;
+  delete d.settings.ppSaltIdx;
+ }
+ return d;
+ },
+};
+
+// Runs all migration steps from fromVersion+1 up to SCHEMA_VERSION
+// Returns { data, steps } where steps lists which versions were applied
+async function applyMigrations(dataObj, fromVersion) {
+ let d = JSON.parse(JSON.stringify(dataObj)); // deep-clone — never mutate original
+ const from = parseInt(fromVersion) || 1;
+ const steps = [];
+ for (let v = from + 1; v <= SCHEMA_VERSION; v++) {
+ if (migrations[v]) {
+ d = migrations[v](d);
+ steps.push(v);
+ }
+ }
+ return { data: d, steps };
+}
+
+// Called at startup — migrates live IndexedDB data if it's behind SCHEMA_VERSION
+async function checkAndMigrateSchema() {
+ const stored = await dbGet('schemaVersion', 1);
+ if (stored >= SCHEMA_VERSION) return; // already up to date
+
+ console.log(`[CaféOS] Schema upgrade needed: v${stored} → v${SCHEMA_VERSION}`);
+
+ const snapshot = {
+ menu: S.menu, raw: S.raw, sales: S.sales,
+ expenses: S.expenses, staff: S.staff,
+ salaryPayments: S.salaryPayments, settings: S.settings
+ };
+
+ const { data: migrated, steps } = await applyMigrations(snapshot, stored);
+
+ // Write migrated data back to state and DB
+ const arrayKeys = ['menu','raw','sales','expenses','staff','salaryPayments','settings'];
+ for (const key of arrayKeys) {
+ if (migrated[key] !== undefined) {
+ S[key] = migrated[key];
+ await persist(key);
+ }
+ }
+ await dbSet('schemaVersion', SCHEMA_VERSION);
+
+ console.log(`[CaféOS] Migration complete. Steps applied: ${steps.join(', ')}`);
+}
+
+function defaultMenu() {
+ return [
+ {id:uid(),name:'Veg Biryani',price:90,category:'Main Course',gst:true,code:'VB',available:true},
+ {id:uid(),name:'Hakka Noodles',price:120,category:'Noodles',gst:true,code:'HN',available:true},
+ {id:uid(),name:'Butter Naan',price:40,category:'Bread',gst:false,code:'BN',available:true},
+ {id:uid(),name:'Masala Chai',price:25,category:'Beverages',gst:false,code:'MC',available:true},
+ {id:uid(),name:'Paneer Tikka',price:180,category:'Starters',gst:true,code:'PT',available:true},
+ {id:uid(),name:'Dal Makhani',price:110,category:'Main Course',gst:true,code:'DM',available:true},
+ {id:uid(),name:'Mango Lassi',price:60,category:'Beverages',gst:false,code:'ML',available:true},
+ ];
+}
+
+// ════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function today(){return new Date().toISOString().slice(0,10);}
+function nowTime(){return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});}
+function fmt(n){return '₹'+Number(n||0).toFixed(2);}
+function fmtDate(iso){try{return new Date(iso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}catch{return iso||'';}}
+async function rno(){
+ const now=new Date();
+ const year=now.getFullYear();
+ const month=String(now.getMonth()+1).padStart(2,'0');
+ const monthKey='inv_counter_'+year+'_'+(now.getMonth()+1);
+ let counter=await dbGet(monthKey,0);
+ const next=(counter+1>9999)?1:counter+1;
+ const receiptNo=year+'-'+month+'-'+String(next).padStart(4,'0');
+ // commit() MUST be called after bill is persisted — never before
+ const commit=async()=>await dbSet(monthKey,next);
+ return{receiptNo,commit};
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function $$(id){return document.getElementById(id);}
+function fmtMonth(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(y,mo-1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});}
+
+// ════════════════════════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════════════════════════
+function tickClock(){
+ const now=new Date();
+ $$('clock-display').textContent=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+}
+setInterval(tickClock,1000); tickClock();
+
+// ════════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════════
+function gotoTab(id,btn){
+ const next=$$('tab-'+id);
+ if(!next||next.classList.contains('active'))return;
+ const current=document.querySelector('.tab.active');
+ document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+ if(btn)btn.classList.add('active');
+ const renders={orders:renderOnlineOrders,dashboard:renderDashboard,menu:renderMenuTable,raw:renderRawTable,stock:renderStock,history:renderHistory,expenses:renderExpenses,staff:renderStaff,report:()=>{renderReport();renderMonthlyReport&&renderMonthlyReport();},settings:loadSettings};
+ const show=()=>{
+ if(current){current.classList.remove('active');current.style.animation='';}
+ next.classList.add('active');
+ if(renders[id])renders[id]();
+ };
+ if(current){current.style.animation='tabOut .15s ease forwards';setTimeout(show,150);}
+ else{show();}
+}
+
+// ════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════
+function openLogin(){openModal('mo-login');$$('lp').value='';$$('lerr').textContent='';setTimeout(()=>$$('lp').focus(),100);}
+function tryLogin(){
+ if($$('lp').value===S.pass){
+ S.isAdmin=true; closeModal('mo-login');
+ $$('ab').style.display='inline';
+ $$('admin-btn').style.display='none';
+ $$('logout-btn').style.display='inline-flex';
+ document.querySelectorAll('.admin-only').forEach(b=>b.style.display='inline-flex');
+ gotoTab('dashboard',document.querySelector('[data-tab="dashboard"]'));
+ } else { $$('lerr').textContent='Incorrect password. Try again.'; }
+}
+function doLogout(){
+ S.isAdmin=false;
+ $$('ab').style.display='none';
+ $$('admin-btn').style.display='inline-flex';
+ $$('logout-btn').style.display='none';
+ document.querySelectorAll('.admin-only').forEach(b=>b.style.display='none');
+ gotoTab('billing',document.querySelector('[data-tab="billing"]'));
+}
+
+// ════════════════════════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════════════════════════
+function openModal(id){$$(id).classList.add('open');}
+function closeModal(id){$$(id).classList.remove('open');}
+
+// ════════════════════════════════════════════════════════════
+// LOGO
+// ════════════════════════════════════════════════════════════
+
+function uploadCafeLogo(inp){
+ const file=inp.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=async e=>{
+ const logoData=e.target.result;
+ await dbSet('cafeLogoData',logoData);
+ applyCafeLogo(logoData);
+ };
+ reader.readAsDataURL(file);
+}
+
+function applyCafeLogo(data){
+ const img=document.getElementById('cafe-logo-img');
+ const ph=document.getElementById('cafe-logo-placeholder');
+ if(data){
+ img.src=data;img.style.display='block';
+ if(ph)ph.style.display='none';
+ }else{
+ img.style.display='none';img.src='';
+ if(ph)ph.style.display='flex';
+ }
+ // Also update settings preview
+ refreshLogoSettingsUI(data);
+}
+
+function refreshLogoSettingsUI(data){
+ const preview=document.getElementById('settings-logo-preview');
+ const upload=document.getElementById('settings-logo-upload');
+ const sImg=document.getElementById('settings-logo-img');
+ if(data){
+ if(sImg)sImg.src=data;
+ if(preview)preview.style.display='flex';
+ if(upload)upload.style.display='none';
+ }else{
+ if(preview)preview.style.display='none';
+ if(upload)upload.style.display='block';
+ }
+}
+
+async function clearCafeLogo(){
+ await dbSet('cafeLogoData',null);
+ applyCafeLogo(null);
+}
+
+function handleLogoDrop(ev){
+ ev.preventDefault();
+ document.getElementById('settings-logo-upload').style.borderColor='var(--border2)';
+ const file=ev.dataTransfer.files[0];
+ if(file&&file.type.startsWith('image/'))uploadCafeLogo({files:[file]});
+}
+
+// ════════════════════════════════════════════════════════════
+// QR
+// ════════════════════════════════════════════════════════════
+function uploadQR(inp){
+ const file=inp.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=async e=>{
+ S.qrData=e.target.result;
+ await dbSet('qrData',S.qrData);
+ refreshQRUI();
+ };
+ reader.readAsDataURL(file);
+}
+function handleQRDrop(ev){
+ ev.preventDefault();
+ $$('qr-upload-area').style.borderColor='var(--border2)';
+ const file=ev.dataTransfer.files[0];
+ if(file&&file.type.startsWith('image/'))uploadQR({files:[file]});
+}
+async function clearQR(){
+ S.qrData=null;
+ await dbSet('qrData',null);
+ const fi=$$('qr-file-input');if(fi)fi.value='';
+ refreshQRUI();
+}
+function refreshQRUI(){
+ // Settings panel
+ const activeBox=$$('qr-active-box');
+ const uploadArea=$$('qr-upload-area');
+ const qrImg=$$('qr-img');
+ if(S.qrData){
+ if(qrImg)qrImg.src=S.qrData;
+ if(activeBox)activeBox.style.display='flex';
+ if(uploadArea)uploadArea.style.display='none';
+ }else{
+ if(activeBox)activeBox.style.display='none';
+ if(uploadArea)uploadArea.style.display='block';
+ }
+ // Billing panel badge (staff sees this, not the upload)
+ const badge=$$('billing-qr-badge');
+ const thumb=$$('billing-qr-thumb');
+ if(badge){
+ if(S.qrData&&S.settings.showQR){
+ badge.style.display='flex';
+ if(thumb)thumb.src=S.qrData;
+ }else{
+ badge.style.display='none';
+ }
+ }
+}
+
+// ════════════════════════════════════════════════════════════
+// BILLING
+// ════════════════════════════════════════════════════════════
+let cart=[], activeCat='All', payMode='Cash', discType='%', editId_m=null, editId_r=null, editId_e=null, editId_s=null;
+
+function setPay(btn){document.querySelectorAll('.pmb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');payMode=btn.dataset.pay;}
+function toggleDiscType(){discType=discType==='%'?'₹':'%';$$('disc-type').textContent=discType;renderCart();}
+function clearCart(){cart=[];_activeOnlineOrderId=null;_activeOnlineOrderNotes='';renderCart();}
+
+function renderGrid(){
+ resetDailyIfNeeded();
+ const search=($$('msearch').value||'').toLowerCase();
+ const catEl=$$('catflt');
+ const grid=$$('mgrid');
+ const avail=S.menu.filter(m=>m.available!==false);
+ const cats=['All',...new Set(avail.map(m=>m.category))];
+ catEl.innerHTML=cats.map(c=>`<button class="cfb${c===activeCat?' active':''}" onclick="setAC('${esc(c)}')">${esc(c)}</button>`).join('');
+ const filt=avail.filter(m=>(activeCat==='All'||m.category===activeCat)&&(m.name.toLowerCase().includes(search)||m.code?.toLowerCase().includes(search)));
+ if(!filt.length){grid.innerHTML='<div style="color:var(--dim);font-size:12px;grid-column:1/-1;padding:10px;">No items found</div>';return;}
+ grid.innerHTML=filt.map(item=>{
+ const soldOut=isDailySoldOut(item);
+ const remaining=getDailyRemaining(item);
+ const clickAttr=soldOut?'':'onclick="addToCart(\''+item.id+'\')"';
+ const limitBadge=remaining!==null
+ ?(soldOut
+ ?'<div class="mi-dlimit" style="color:var(--red);">SOLD OUT</div>'
+ :'<div class="mi-dlimit" style="color:var(--green);">'+remaining+' left</div>')
+ :'';
+ return `<div class="mi${soldOut?' sold-out':''}" ${clickAttr}>
+ <div class="mic">${esc(item.category)}${item.code?` · <b>${esc(item.code)}</b>`:''}</div>
+ <div class="min">${esc(item.name)}</div>
+ <div class="mip">${fmt(item.price)}</div>
+ ${item.gst&&S.settings.gstEnabled?'<div class="mig">+GST</div>':''}
+ ${limitBadge}
+ </div>`;
+ }).join('');
+ const todayCount=S.sales.filter(s=>s.date===today()).length;
+ $$('bill-counter-display').textContent=`Today: ${todayCount} bills`;
+}
+
+function setAC(cat){activeCat=cat;renderGrid();}
+
+function addToCart(id){
+ const item=S.menu.find(m=>m.id===id);if(!item)return;
+ const ex=cart.find(c=>c.id===id);
+ if(ex)ex.qty++;else cart.push({...item,qty:1});
+ renderCart();
+}
+function updateQty(id,d){
+ const idx=cart.findIndex(c=>c.id===id);if(idx<0)return;
+ cart[idx].qty+=d;if(cart[idx].qty<=0)cart.splice(idx,1);renderCart();
+}
+function removeCartItem(id){cart=cart.filter(c=>c.id!==id);renderCart();}
+
+function calcCart(){
+ const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
+ const gstBase=S.settings.gstEnabled?cart.filter(c=>c.gst).reduce((s,c)=>s+c.price*c.qty,0):0;
+ const cgst=S.settings.gstEnabled?gstBase*S.settings.cgst/100:0;
+ const sgst=S.settings.gstEnabled?gstBase*S.settings.sgst/100:0;
+ const discRaw=parseFloat($$('disc-inp').value)||0;
+ const discAmt=discType==='%'?subtotal*discRaw/100:Math.min(discRaw,subtotal);
+ const total=Math.max(0,subtotal+cgst+sgst-discAmt);
+ return{subtotal,cgst,sgst,discAmt,total,gstBase};
+}
+
+function renderCart(){
+ const emEl=$$('ce'),itEl=$$('citems'),sumEl=$$('csum');
+ const gbtn=$$('gbtn'),kotbtn=$$('kot-only-btn');
+ const oof=$$('online-order-flag');
+ if(oof)oof.style.display=_activeOnlineOrderId?'block':'none';
+ const oon=$$('online-order-notes');
+ if(oon){
+ if(_activeOnlineOrderId&&_activeOnlineOrderNotes){oon.style.display='block';oon.textContent=' '+_activeOnlineOrderNotes;}
+ else oon.style.display='none';
+ }
+ if(!cart.length){emEl.style.display='block';itEl.style.display='none';sumEl.style.display='none';gbtn.disabled=true;kotbtn.disabled=true;return;}
+ emEl.style.display='none';itEl.style.display='block';sumEl.style.display='block';gbtn.disabled=false;kotbtn.disabled=false;
+ itEl.innerHTML=cart.map(c=>`
+ <div class="ci">
+ <div class="cin"><div class="cin-name">${esc(c.name)}</div><div class="cin-u">${fmt(c.price)} each</div></div>
+ <div class="qc">
+ <button class="qb" onclick="updateQty('${c.id}',-1)">−</button>
+ <span class="qn">${c.qty}</span>
+ <button class="qb" onclick="updateQty('${c.id}',1)">+</button>
+ </div>
+ <div class="cit">${fmt(c.price*c.qty)}</div>
+ <button class="bico btn-sm" onclick="removeCartItem('${c.id}')">Remove</button>
+ </div>`).join('');
+ const{subtotal,cgst,sgst,discAmt,total}=calcCart();
+ $$('ss').textContent=fmt(subtotal);
+ const showGST=cgst>0;
+ $$('cgst-row').style.display=showGST?'flex':'none';
+ $$('sgst-row').style.display=showGST?'flex':'none';
+ if(showGST){$$('cgst-lbl').textContent=`CGST (${S.settings.cgst}%)`;$$('sgst-lbl').textContent=`SGST (${S.settings.sgst}%)`;$$('cgst-v').textContent=fmt(cgst);$$('sgst-v').textContent=fmt(sgst);}
+ $$('disc-row').style.display=discAmt>0?'flex':'none';
+ if(discAmt>0)$$('disc-v').textContent='-'+fmt(discAmt);
+ $$('stot').textContent=fmt(total);
+}
+
+// ── Pending bill state ──────────────────────────────────────
+// generateBill() only previews — nothing is saved or committed.
+// confirmBill() (or printing) is what actually saves the bill,
+// commits the token counter, deducts stock, and clears the cart.
+let _pendingBill = null; // bill object waiting to be confirmed
+let _pendingCommit = null; // async fn to commit the receipt counter
+let _billSaved = false; // true once the bill is in the DB
+let _billGenerating= false; // debounce double-clicks
+
+function updateBillStatusBar(){
+ const bar=$$('bill-status-bar'),btn=$$('confirm-bill-btn'),cancelBtn=$$('ap-cancel-btn');
+ if(!bar)return;
+ if(_billSaved){
+ bar.style.cssText='padding:9px 14px;background:#1e4a33;color:#7fffc0;border:1px solid #2d6a48;border-radius:7px;font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:.8px;text-align:center;';
+ bar.textContent=' BILL SAVED & RECORDED — Token committed. Safe to close.';
+ if(btn){btn.disabled=true;btn.style.opacity='.3';btn.style.cursor='not-allowed';}
+ if(cancelBtn){cancelBtn.textContent=' Close';cancelBtn.style.color='rgba(255,255,255,.6)';cancelBtn.style.background='rgba(255,255,255,.08)';cancelBtn.style.border='1px solid rgba(255,255,255,.15)';cancelBtn.onclick=()=>closeModal('mo-bill');}
+ }else{
+ bar.style.cssText='padding:9px 14px;background:rgba(180,130,0,.2);color:#f0c040;border:1px solid rgba(180,130,0,.38);border-radius:7px;font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:.7px;text-align:center;';
+ bar.textContent=' PREVIEW ONLY — Not saved yet. Print or Save to record this sale.';
+ if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
+ if(cancelBtn){cancelBtn.textContent=' Cancel — Don\'t Save';cancelBtn.style.color='#ff9090';cancelBtn.style.background='rgba(180,50,50,.12)';cancelBtn.style.border='1px solid rgba(180,50,50,.25)';cancelBtn.onclick=closeBillModal;}
+ }
+}
+
+async function buildPendingBill(){
+ if(!cart.length||_billGenerating)return false;
+ _billGenerating=true;
+ try{
+ const{subtotal,cgst,sgst,discAmt,total}=calcCart();
+ const{receiptNo,commit}=await rno(); // peek only — counter NOT committed yet
+ _pendingBill={
+ id:uid(), receiptNo, date:today(), time:nowTime(),
+ customer:$$('c-cust').value||'Walk-in',
+ table:$$('c-table').value||'-',
+ payMode, items:JSON.parse(JSON.stringify(cart)),
+ subtotal,cgst,sgst,discAmt,total,
+ settings:{...S.settings}, qrData:S.qrData,
+ kitchenNotes:_activeOnlineOrderNotes||''
+ };
+ const materialsUsed=buildMaterialsUsed(_pendingBill.items);
+ _pendingBill.materialsUsed=materialsUsed;
+ _pendingCommit=commit;
+ _billSaved=false;
+ // Populate action panel summary card
+ const apNo=$$('ap-receipt-no'),apTot=$$('ap-total'),apInf=$$('ap-info');
+ if(apNo) apNo.textContent='RECEIPT · '+_pendingBill.receiptNo;
+ if(apTot) apTot.textContent=fmt(_pendingBill.total);
+ if(apInf){
+ const itemCount=_pendingBill.items.reduce((s,i)=>s+i.qty,0);
+ apInf.textContent=itemCount+' item'+(itemCount!==1?'s':'')+' · '+_pendingBill.payMode+'\n'+_pendingBill.customer+((_pendingBill.table&&_pendingBill.table!=='-')?' · Table '+_pendingBill.table:'');
+ }
+ const apPanel=$$('ap-panel'); if(apPanel) apPanel.style.display='';
+ // Populate the print DOM — cart unchanged, nothing in DB yet
+ $$('bill-customer').innerHTML=buildBillHTML(_pendingBill);
+ if(S.settings.printKOT){$$('bill-kot').innerHTML=buildKOTHTML(_pendingBill);$$('kot-wrapper').style.display='block';}
+ else{$$('kot-wrapper').style.display='none';}
+ updateBillStatusBar();
+ // Restore confirm button (may have been hidden by KOT-only flow)
+ const btn=$$('confirm-bill-btn');
+ if(btn)btn.style.display='';
+ const bar=$$('bill-status-bar');
+ if(bar)bar.style.display='';
+ return true;
+ }finally{
+ _billGenerating=false;
+ }
+}
+
+async function generateBill(){
+ if(await buildPendingBill()) openModal('mo-bill');
+}
+
+
+
+async function confirmBill(){
+ if(!_pendingBill||_billSaved)return;
+ S.sales.unshift(_pendingBill);
+ await persist('sales'); // save bill to DB
+ await _pendingCommit(); // commit token counter NOW
+ updateDailyStock(_pendingBill.items); // track daily sold counts
+ if(_pendingBill.materialsUsed&&_pendingBill.materialsUsed.length)
+ await deductRawStock(_pendingBill.materialsUsed);
+ if(_activeOnlineOrderId) await markOnlineOrderBilled(_pendingBill.receiptNo,_pendingBill.total);
+ _billSaved=true;
+ updateBillStatusBar();
+ renderGrid();
+ // Clear cart
+ cart=[];$$('c-cust').value='';$$('c-table').value='';$$('disc-inp').value='0';
+ document.querySelectorAll('.pmb').forEach(b=>b.classList.remove('active'));
+ document.querySelector('[data-pay="Cash"]').classList.add('active');
+ payMode='Cash';
+ renderCart();
+}
+
+function closeBillModal(){
+ closeModal('mo-bill');
+ const apPanel=$$('ap-panel'); if(apPanel) apPanel.style.display='';
+ // Restore print-only mode changes
+ const confirmBtn=$$('confirm-bill-btn');
+ if(confirmBtn) confirmBtn.style.display='';
+ const footerEl=$$('ap-footer-tip');
+ if(footerEl) footerEl.textContent='CANCEL KEEPS CART UNCHANGED\nTOKEN NUMBER NOT COMMITTED';
+ if(!_billSaved){
+ _pendingBill=null;
+ _pendingCommit=null;
+ }
+}
+
+// ════════════════════════════════════════════════════════════
+// PRINT — uses window.open() for cross-browser reliability
+// (avoids Safari's window.print() + CSS visibility bugs)
+// ════════════════════════════════════════════════════════════
+const _PRINT_CSS=`@page{margin:3mm;size:80mm auto;}*{box-sizing:border-box;}body{margin:0;padding:0;background:#fff;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.75;color:#000;}.rp-center{text-align:center;}.rp-shop{font-weight:900;font-size:15px;letter-spacing:1px;}.rp-div{border:none;border-top:1px dashed #999;margin:6px 0;}.rp-row{display:flex;justify-content:space-between;margin-bottom:1px;}.rp-total{display:flex;justify-content:space-between;font-weight:900;font-size:14px;border-top:1.5px solid #000;padding-top:5px;margin-top:5px;}.kot-title{font-size:18px;font-weight:900;text-align:center;letter-spacing:2px;margin-bottom:4px;}.kot-sub{text-align:center;font-size:11px;color:#666;margin-bottom:10px;}.kot-item{display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:4px 0;border-bottom:1px dashed #ddd;}img{max-width:80px;height:80px;display:block;margin:0 auto;}`;
+
+function _openPrintWin(bodyHtml){
+ const w=window.open('','_blank','width=430,height=720,menubar=no,toolbar=no,location=no,status=no');
+ if(!w){alert('Pop-ups are blocked.\nPlease allow pop-ups for this page to enable printing.');return;}
+ w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt</title><style>${_PRINT_CSS}</style></head><body>${bodyHtml}</body></html>`);
+ w.document.close();
+ setTimeout(()=>{try{w.focus();w.print();setTimeout(()=>{try{w.close();}catch(e){}},900);}catch(e){console.error('[Print]',e);}},350);
+}
+
+function printKOTOnly(){
+ if(!cart.length)return;
+ _pendingBill=null;_pendingCommit=null;_billSaved=false;
+ const tempBill={receiptNo:'KOT-'+Date.now().toString().slice(-4),date:today(),time:nowTime(),customer:$$('c-cust').value||'Walk-in',table:$$('c-table').value||'-',items:JSON.parse(JSON.stringify(cart))};
+ _openPrintWin(`<div style="width:80mm;padding:18px 20px;border:2px dashed #8b5e3c;">${buildKOTHTML(tempBill)}</div>`);
+}
+
+let printTarget='both';
+async function printBill(target){
+ if(!_billSaved&&_pendingBill) await confirmBill();
+ const custInner=$$('bill-customer').innerHTML;
+ const kotInner=$$('bill-kot').innerHTML;
+ const showCust=target==='both'||target==='customer';
+ const showKOT=(target==='both'||target==='kot')&&S.settings.printKOT!==false;
+ let body='';
+ if(showCust) body+=`<div style="width:80mm;padding:16px 14px;">${custInner}</div>`;
+ if(showCust&&showKOT) body+=`<div style="page-break-after:always;"></div>`;
+ if(showKOT)  body+=`<div style="width:80mm;padding:18px 20px;border:2px dashed #8b5e3c;">${kotInner}</div>`;
+ if(body) _openPrintWin(body);
+}
+
+// ════════════════════════════════════════════════════════════
+// PHONEPE PAYMENT GATEWAY
+// ════════════════════════════════════════════════════════════
+//
+// ⚠️  IMPORTANT — HOW PHONEPE PG WORKS (READ THIS):
+//
+//  PhonePe's /pg/v1/pay API does NOT allow direct browser calls (CORS blocked).
+//  The Salt Key MUST stay on the server — never exposed to the browser.
+//
+//  ARCHITECTURE REQUIRED:
+//    Browser → Your Backend Proxy → PhonePe API → returns redirect URL → User pays
+//
+//  You MUST deploy a thin backend (Node.js / PHP / Python serverless function)
+//  that receives {amount, orderId} from this app, signs the request using your
+//  Salt Key, calls PhonePe's API, and returns the redirect URL.
+//
+//  Set the "Backend Proxy URL" field in Settings → PhonePe to your deployed
+//  endpoint URL.  Example: https://your-cafe-server.vercel.app/api/phonepe/pay
+//
+//  For IN-STORE use without a backend → use UPI deep link (no server needed).
+//  The PhonePe business UPI ID field is sufficient for QR/deep-link payments.
+
+// ── Pure-JS SHA-256 (fallback for Safari on file:// where SubtleCrypto is unavailable) ──
+const _K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function _sha256pure(str){
+ const msg=new TextEncoder().encode(str);
+ const l=msg.length;
+ const buf=new ArrayBuffer(((l+72)>>6)<<6);
+ const arr=new Uint8Array(buf);
+ arr.set(msg);arr[l]=0x80;
+ const dv=new DataView(buf);
+ dv.setUint32(buf.byteLength-4,(l*8)&0xffffffff);
+ const w=new Int32Array(64);
+ let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+ for(let i=0;i<buf.byteLength;i+=64){
+  for(let j=0;j<16;j++)w[j]=dv.getInt32(i+j*4);
+  for(let j=16;j<64;j++){const s0=(w[j-15]>>>7|w[j-15]<<25)^(w[j-15]>>>18|w[j-15]<<14)^(w[j-15]>>>3);const s1=(w[j-2]>>>17|w[j-2]<<15)^(w[j-2]>>>19|w[j-2]<<13)^(w[j-2]>>>10);w[j]=(w[j-16]+s0+w[j-7]+s1)|0;}
+  let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+  for(let j=0;j<64;j++){const S1=(e>>>6|e<<26)^(e>>>11|e<<21)^(e>>>25|e<<7);const ch=(e&f)^(~e&g);const T1=(h+S1+ch+_K[j]+w[j])|0;const S0=(a>>>2|a<<30)^(a>>>13|a<<19)^(a>>>22|a<<10);const maj=(a&b)^(a&c)^(b&c);const T2=(S0+maj)|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}
+  h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+ }
+ return[h0,h1,h2,h3,h4,h5,h6,h7].map(n=>(n>>>0).toString(16).padStart(8,'0')).join('');
+}
+
+async function sha256hex(msg){
+ // Use SubtleCrypto when available (HTTPS), fall back to pure-JS (file://, Safari quirks)
+ try{
+  if(crypto&&crypto.subtle){
+   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));
+   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+ }catch(e){}
+ return _sha256pure(msg);
+}
+
+// ── Initiate PhonePe PG payment via your backend proxy ──
+// Returns {ok:true, url, txnId} or {ok:false, error}
+// The backend proxy MUST:
+//   POST /your-endpoint  ← receives {amount_paise, merchantTransactionId, merchantUserId, redirectUrl, env}
+//   Signs with salt key, calls PhonePe, returns {ok:true, url} or {ok:false, error}
+async function initiatePhonePePG(amount,mobile,orderId){
+ const {ppMerchantId,ppProxyUrl,ppEnv}=S.settings;
+ if(!ppProxyUrl||!ppMerchantId){
+  console.warn('[PhonePe] PG requires a backend proxy URL. Set it in Settings → PhonePe.');
+  return{ok:false,error:'PhonePe PG backend proxy URL not configured. Add it in Settings.'};
+ }
+ const txnId='CAFE'+Date.now();
+ // redirectUrl = where PhonePe sends the CUSTOMER after payment.
+ // Must be the deployed customer-menu URL (HTTPS), NOT the BrewOps staff screen.
+ const redirectUrl=(S.settings.ppRedirectUrl||'').trim()||'https://your-cafe.netlify.app';
+ const payload={
+  merchantTransactionId:txnId,
+  merchantUserId:(mobile||'GUEST').replace(/\D/g,'').slice(-10)||'GUEST001',
+  amount_paise:Math.round(parseFloat(amount)*100),
+  redirectUrl,
+  env:ppEnv||'sandbox'
+ };
+ try{
+  const resp=await fetch(ppProxyUrl,{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify(payload)
+  });
+  if(!resp.ok)throw new Error('Proxy HTTP '+resp.status);
+  const data=await resp.json();
+  if(data.ok&&data.url)return{ok:true,url:data.url,txnId};
+  return{ok:false,error:data.error||'Proxy returned no URL'};
+ }catch(e){
+  console.warn('[PhonePe] Proxy call failed:',e.message);
+  return{ok:false,error:e.message};
+ }
+}
+
+// ── Poll PhonePe payment status via your backend proxy ──
+async function checkPhonePeStatus(txnId){
+ const {ppMerchantId,ppProxyUrl,ppEnv}=S.settings;
+ if(!ppProxyUrl||!ppMerchantId||!txnId)return null;
+ // Derive status URL: replace /pay at end with /status, or append /status to base
+ const statusUrl=ppProxyUrl.replace(/\/phonepe[-\/]?pay$/i,'/phonepe-status')
+  .replace(/\/pay$/,'/status');
+ try{
+  const resp=await fetch(statusUrl,{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({merchantTransactionId:txnId,env:ppEnv||'sandbox'})
+  });
+  const data=await resp.json();
+  return data?.state||null;
+ }catch(e){return null;}
+}
+
+// ════════════════════════════════════════════════════════════
+// BILL HTML BUILDER
+// ════════════════════════════════════════════════════════════
+function buildBillHTML(bill){
+ const s=bill.settings||S.settings;
+ const gstRows=bill.cgst>0?`<div class="rp-row"><span>CGST (${s.cgst}%):</span><span>${fmt(bill.cgst)}</span></div><div class="rp-row"><span>SGST (${s.sgst}%):</span><span>${fmt(bill.sgst)}</span></div>`:'';
+ const discRow=bill.discAmt>0?`<div class="rp-row" style="color:green;"><span>Discount:</span><span>-${fmt(bill.discAmt)}</span></div>`:'';
+ const qrSection=s.showQR&&bill.qrData?`<div style="text-align:center;margin-top:8px;"><div style="font-size:10px;margin-bottom:3px;">Scan to Pay</div><img src="${bill.qrData}" style="width:80px;height:80px;"></div>`:'';
+ const fssai=s.fssai?`<div style="font-size:10px;">FSSAI: ${esc(s.fssai)}</div>`:'';
+ return `
+ <div class="rp-center">
+ <div class="rp-shop">${esc(s.shopName)}</div>
+ ${s.tagline?`<div style="font-size:10px;">${esc(s.tagline)}</div>`:''}
+ <div style="font-size:10px;">${esc(s.addr1)}${s.addr2?', '+esc(s.addr2):''}</div>
+ ${s.contact?`<div style="font-size:10px;"> ${esc(s.contact)}</div>`:''}
+ ${fssai}
+ </div>
+ <hr class="rp-div">
+ <div class="rp-row"><span>Date: ${fmtDate(bill.date)}</span><span>Time: ${bill.time}</span></div>
+ <div class="rp-row"><span>Table: ${esc(bill.table)}</span><span></span></div>
+ <hr class="rp-div">
+ <div style="margin-bottom:6px;font-size:11px;">
+ <div><b>RECEIPT NO</b> − ${esc(bill.receiptNo)}</div>
+ <div><b>CUSTOMER</b> − ${esc(bill.customer)}</div>
+ <div><b>PAYMENT</b> − ${esc(bill.payMode)}</div>
+ ${s.gstin?`<div><b>GSTIN:</b> ${esc(s.gstin)}</div>`:''}
+ </div>
+ <hr class="rp-div">
+ <div class="rp-row" style="font-weight:700;font-size:10px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:3px;"><span>ITEM</span><span>AMOUNT</span></div>
+ ${bill.items.map(i=>`<div class="rp-row"><span>${i.qty}×${esc(i.name)}</span><span>${fmt(i.price*i.qty)}</span></div>`).join('')}
+ <hr class="rp-div" style="margin-top:6px;">
+ <div class="rp-row"><span>SUBTOTAL:</span><span>${fmt(bill.subtotal)}</span></div>
+ ${gstRows}${discRow}
+ <div class="rp-total"><span>TOTAL:</span><span>${fmt(bill.total)}</span></div>
+ ${qrSection}
+ <div style="text-align:center;margin-top:10px;font-size:10px;border-top:1px dashed #999;padding-top:8px;">
+ <div>${esc(s.thanks)}</div>
+ <div style="margin-top:3px;font-weight:700;">*** THANK YOU ***</div>
+ <div style="margin-top:3px;font-size:9px;color:#999;">Powered by BrewOps</div>
+ </div>`;
+}
+
+function buildKOTHTML(bill){
+ return `
+ <div class="kot-title">KOT</div>
+ <div class="kot-sub">Kitchen Order Ticket</div>
+ <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+ <span><b>Token:</b> ${esc(bill.receiptNo||'—')}</span>
+ <span><b>Table:</b> ${esc(bill.table||'—')}</span>
+ </div>
+ <div style="font-size:11px;margin-bottom:8px;"><b>Time:</b> ${bill.time||nowTime()} | <b>Customer:</b> ${esc(bill.customer||'Walk-in')}</div>
+ <div style="border-top:2px solid #f5c518;padding-top:8px;">
+ ${bill.items.map(i=>`<div class="kot-item"><span>${i.qty} × ${esc(i.name)}</span><span style="font-size:11px;color:#666;">${i.code||''}</span></div>`).join('')}
+ </div>
+ ${bill.kitchenNotes?`<div style="margin-top:8px;font-size:11px;font-weight:700;border-top:1px dashed #ccc;padding-top:6px;">Note: ${esc(bill.kitchenNotes)}</div>`:''}
+ <div style="text-align:center;margin-top:10px;font-size:11px;border-top:1px dashed #ccc;padding-top:6px;color:#666;">Prepare items in order received</div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════
+function renderDashboard(){
+ const td=S.sales.filter(s=>s.date===today());
+ const trev=td.reduce((s,b)=>s+b.total,0);
+ const allrev=S.sales.reduce((s,b)=>s+b.total,0);
+ const traw=S.raw.filter(r=>r.date===today()).reduce((s,r)=>s+r.quantity*r.ppu,0);
+ const allraw=S.raw.reduce((s,r)=>s+r.quantity*r.ppu,0);
+ const allexp=S.expenses.reduce((s,e)=>s+e.amount,0);
+ const allsal=S.salaryPayments.reduce((s,p)=>s+p.amount,0);
+ const profit=allrev-allraw-allexp-allsal;
+ $$('dash-stats').innerHTML=[
+ {l:"Today's Revenue",v:fmt(trev),sub:`${td.length} bills`,c:'var(--gold)'},
+ {l:"Total Revenue",v:fmt(allrev),sub:`${S.sales.length} total bills`,c:'var(--green)'},
+ {l:"Today's Raw Cost",v:fmt(traw),sub:'purchased today',c:'var(--red)'},
+ {l:"Total Raw Cost",v:fmt(allraw),sub:`${S.raw.length} entries`,c:'var(--red)'},
+ {l:"Total Expenses",v:fmt(allexp),sub:`${S.expenses.length} entries`,c:'var(--orange)'},
+ {l:"Total Salaries Paid",v:fmt(allsal),sub:`${S.salaryPayments.length} payments`,c:'var(--purple)'},
+ {l:"Net Profit / Loss",v:fmt(profit),sub:'rev − raw − exp − sal',c:profit>=0?'var(--green)':'var(--red)'},
+ {l:"Active Staff",v:S.staff.length,sub:'staff members',c:'var(--blue)'},
+ ].map(c=>`<div class="sc" style="border:1px solid ${c.c}33;"><div class="sl">${c.l}</div><div class="sv" style="color:${c.c};">${c.v}</div><div class="ss">${c.sub}</div></div>`).join('');
+
+ $$('dash-recent').innerHTML=S.sales.slice(0,7).map(b=>`
+ <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);">
+ <span class="muted">${esc(b.receiptNo)}</span><span>${esc(b.customer)}</span><span class="muted">${b.date}</span><span class="gold" style="font-weight:700;">${fmt(b.total)}</span>
+ </div>`).join('')||'<div style="color:var(--dim);font-size:12px;padding:10px 0;">No bills yet</div>';
+
+ // Top items today
+ const ic={};
+ td.forEach(b=>b.items.forEach(i=>{if(!ic[i.name])ic[i.name]={qty:0,rev:0};ic[i.name].qty+=i.qty;ic[i.name].rev+=i.price*i.qty;}));
+ const top=Object.entries(ic).sort((a,b)=>b[1].rev-a[1].rev).slice(0,6);
+ $$('dash-top').innerHTML=top.map(([n,d])=>`
+ <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);">
+ <span>${esc(n)}</span><span class="muted">×${d.qty}</span><span class="gold">${fmt(d.rev)}</span>
+ </div>`).join('')||'<div style="color:var(--dim);font-size:12px;padding:10px 0;">No sales today</div>';
+}
+
+// ════════════════════════════════════════════════════════════
+// MENU MANAGER
+// ════════════════════════════════════════════════════════════
+function renderMenuTable(){
+ const s=($$('mts').value||'').toLowerCase();
+ const filt=S.menu.filter(m=>m.name.toLowerCase().includes(s)||m.category.toLowerCase().includes(s)||(m.code||'').toLowerCase().includes(s));
+ $$('menu-count').textContent=`${filt.length} items`;
+ $$('mt-body').innerHTML=filt.map(m=>`
+ <tr>
+ <td><span class="chip">${esc(m.code||'—')}</span></td>
+ <td style="font-weight:600;">${esc(m.name)}</td>
+ <td class="muted">${esc(m.category)}</td>
+ <td class="gold mono" style="font-weight:700;">${fmt(m.price)}</td>
+ <td>${m.gst?'<span style="color:var(--green);font-size:10px;font-weight:700;">YES</span>':'<span style="color:var(--dim);font-size:10px;">NO</span>'}</td>
+ <td>${m.available!==false?'<span style="color:var(--green);font-size:10px;">ON</span>':'<span style="color:var(--red);font-size:10px;">OFF</span>'}</td>
+ <td>${m.dailyLimit>0?`<span style="font-family:var(--mono);font-weight:700;">${m.dailyLimit}</span> <span style="color:var(--dim);font-size:10px;">(${getDailySold(m.id)} sold · ${getDailyRemaining(m)} left)</span>`:'<span style="color:var(--dim);font-size:10px;">—</span>'}</td>
+ <td>${(m.recipe&&m.recipe.length)?`<button class="bico btn-sm" style="color:var(--green);font-size:10px;white-space:nowrap;" onclick="openRecipe('${m.id}')"> ${m.recipe.length} item${m.recipe.length>1?'s':''}</button>`:`<button class="bico btn-sm" style="color:var(--dim);font-size:10px;" onclick="openRecipe('${m.id}')">+ Set Recipe</button>`}</td>
+ <td><div style="display:flex;gap:5px;">
+ <button class="bico" onclick="editMenu('${m.id}')">Edit</button>
+ <button class="bico" style="color:var(--red);" onclick="toggleAvail('${m.id}')">${m.available!==false?'Disable':'Enable'}</button>
+ <button class="bico" style="color:var(--red);" onclick="delMenu('${m.id}')">Delete</button>
+ </div></td>
+ </tr>`).join('');
+ if(!filt.length)$$('mt-body').innerHTML='<tr><td colspan="7" class="erow">No items found</td></tr>';
+}
+
+async function saveMenu(){
+ const name=$$('mf-name').value.trim(),cat=$$('mf-cat').value.trim(),price=parseFloat($$('mf-price').value),code=$$('mf-code').value.trim(),gst=$$('mf-gst').checked,available=$$('mf-avail').checked,dailyLimit=parseInt($$('mf-dlimit').value)||0;
+ if(!name||!cat||isNaN(price)||price<0){alert('Please fill Name, Category and valid Price.');return;}
+ if(editId_m){const i=S.menu.findIndex(m=>m.id===editId_m);if(i>=0)S.menu[i]={...S.menu[i],id:editId_m,name,category:cat,price,code,gst,available,dailyLimit};}
+ else S.menu.push({id:uid(),name,category:cat,price,code,gst,available,dailyLimit,recipe:[]});
+ await persist('menu');cancelMenuEdit();renderMenuTable();renderGrid();syncMenuToCloud();
+}
+
+function editMenu(id){
+ const m=S.menu.find(m=>m.id===id);if(!m)return;
+ editId_m=id;
+ $$('mf-name').value=m.name;$$('mf-cat').value=m.category;$$('mf-price').value=m.price;$$('mf-code').value=m.code||'';$$('mf-gst').checked=m.gst;$$('mf-avail').checked=m.available!==false;$$('mf-dlimit').value=m.dailyLimit||0;
+ $$('mft').textContent=' EDIT MENU ITEM';$$('mf-cancel').style.display='inline-flex';
+}
+
+async function delMenu(id){if(!confirm('Delete this item?'))return;S.menu=S.menu.filter(m=>m.id!==id);await persist('menu');renderMenuTable();renderGrid();syncMenuToCloud();}
+async function toggleAvail(id){const i=S.menu.findIndex(m=>m.id===id);if(i<0)return;S.menu[i].available=S.menu[i].available===false;await persist('menu');renderMenuTable();renderGrid();syncMenuToCloud();}
+function cancelMenuEdit(){editId_m=null;['mf-name','mf-cat','mf-price','mf-code'].forEach(i=>$$(i).value='');$$('mf-dlimit').value='0';$$('mf-gst').checked=true;$$('mf-avail').checked=true;$$('mft').textContent=' ADD MENU ITEM';$$('mf-cancel').style.display='none';}
+
+// ════════════════════════════════════════════════════════════
+// RAW MATERIALS
+// ════════════════════════════════════════════════════════════
+function renderRawTable(){
+ const s=($$('rts').value||'').toLowerCase();
+ const filt=S.raw.filter(r=>r.name.toLowerCase().includes(s)||(r.category||'').toLowerCase().includes(s));
+ const total=S.raw.reduce((s,r)=>s+r.quantity*r.ppu,0);
+ $$('raw-total').textContent=fmt(total);
+ $$('rt-body').innerHTML=filt.map(r=>`
+ <tr>
+ <td style="font-weight:600;">${esc(r.name)}</td>
+ <td class="muted">${esc(r.category||'')}</td>
+ <td>${r.quantity}</td>
+ <td class="muted">${esc(r.unit)}</td>
+ <td class="gold mono">${fmt(r.ppu)}</td>
+ <td class="green mono" style="font-weight:700;">${fmt(r.quantity*r.ppu)}</td>
+ <td class="muted">${esc(r.supplier||'')}</td>
+ <td class="muted">${esc(r.invoiceNo||'')}</td>
+ <td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td>
+ <td class="muted" style="max-width:110px;overflow:hidden;text-overflow:ellipsis;">${esc(r.notes||'')}</td>
+ <td><div style="display:flex;gap:5px;">
+ <button class="bico" onclick="editRaw('${r.id}')">Edit</button>
+ <button class="bico" style="color:var(--red);" onclick="delRaw('${r.id}')">Delete</button>
+ </div></td>
+ </tr>`).join('');
+ if(!filt.length)$$('rt-body').innerHTML='<tr><td colspan="11" class="erow">No entries</td></tr>';
+}
+
+async function saveRaw(){
+ const name=$$('rf-name').value.trim(),cat=$$('rf-cat').value.trim(),qty=parseFloat($$('rf-qty').value),unit=$$('rf-unit').value,ppu=parseFloat($$('rf-ppu').value),supplier=$$('rf-supp').value.trim(),invoiceNo=$$('rf-inv').value.trim(),date=$$('rf-date').value||today(),notes=$$('rf-notes').value.trim();
+ if(!name||isNaN(qty)||isNaN(ppu)||qty<0||ppu<0){alert('Please fill Name, Quantity, and Price per Unit.');return;}
+ const item={name,category:cat,quantity:qty,unit,ppu,supplier,invoiceNo,date,notes};
+ if(editId_r){const i=S.raw.findIndex(r=>r.id===editId_r);if(i>=0)S.raw[i]={id:editId_r,...item};}
+ else S.raw.push({id:uid(),...item});
+ await persist('raw');cancelRawEdit();renderRawTable();
+}
+
+function editRaw(id){
+ const r=S.raw.find(r=>r.id===id);if(!r)return;
+ editId_r=id;
+ $$('rf-name').value=r.name;$$('rf-cat').value=r.category||'';$$('rf-qty').value=r.quantity;$$('rf-unit').value=r.unit;$$('rf-ppu').value=r.ppu;$$('rf-supp').value=r.supplier||'';$$('rf-inv').value=r.invoiceNo||'';$$('rf-date').value=r.date;$$('rf-notes').value=r.notes||'';
+ $$('rft').textContent=' EDIT ENTRY';$$('rf-cancel').style.display='inline-flex';
+}
+
+async function delRaw(id){if(!confirm('Delete this entry?'))return;S.raw=S.raw.filter(r=>r.id!==id);await persist('raw');renderRawTable();}
+function cancelRawEdit(){editId_r=null;['rf-name','rf-cat','rf-qty','rf-ppu','rf-supp','rf-inv','rf-notes'].forEach(i=>$$(i).value='');$$('rf-unit').value='kg';$$('rf-date').value=today();$$('rft').textContent=' ADD PURCHASE ENTRY';$$('rf-cancel').style.display='none';}
+
+// ════════════════════════════════════════════════════════════
+// STOCK
+// ════════════════════════════════════════════════════════════
+function renderStock(){
+ const totalRaw=S.raw.reduce((s,r)=>s+r.quantity*r.ppu,0);
+ const totalRev=S.sales.reduce((s,b)=>s+b.total,0);
+ const totalExp=S.expenses.reduce((s,e)=>s+e.amount,0);
+ const totalSal=S.salaryPayments.reduce((s,p)=>s+p.amount,0);
+ const profit=totalRev-totalRaw-totalExp-totalSal;
+ $$('stock-stats').innerHTML=[
+ {l:'Total Raw Material Cost',v:fmt(totalRaw),c:'var(--red)'},
+ {l:'Total Sales Revenue',v:fmt(totalRev),c:'var(--green)'},
+ {l:'Total Expenses',v:fmt(totalExp),c:'var(--orange)'},
+ {l:'Total Salaries',v:fmt(totalSal),c:'var(--purple)'},
+ {l:'Net Profit / Loss',v:fmt(profit),c:profit>=0?'var(--green)':'var(--red)'},
+ ].map(c=>`<div class="sc" style="border:1px solid ${c.c}33;"><div class="sl">${c.l}</div><div class="sv" style="color:${c.c};">${c.v}</div></div>`).join('');
+
+ const groups={};
+ S.raw.forEach(r=>{const k=r.name+'||'+r.unit;if(!groups[k])groups[k]={name:r.name,unit:r.unit,tq:0,tc:0};groups[k].tq+=r.quantity;groups[k].tc+=r.quantity*r.ppu;});
+ $$('st-body').innerHTML=Object.values(groups).map(i=>`<tr><td style="font-weight:600;">${esc(i.name)}</td><td class="green mono">${i.tq}</td><td class="muted">${esc(i.unit)}</td><td class="gold mono" style="font-weight:700;">${fmt(i.tc)}</td></tr>`).join('')||'<tr><td colspan="4" class="erow">No raw materials entered</td></tr>';
+
+ $$('tally').innerHTML=`
+ <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span class="muted">Raw Material Cost</span><span class="red">${fmt(totalRaw)}</span></div>
+ <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span class="muted">Total Expenses</span><span style="color:var(--orange);">${fmt(totalExp)}</span></div>
+ <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span class="muted">Total Salaries Paid</span><span class="muted">${fmt(totalSal)}</span></div>
+ <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span class="muted">Total Sales Revenue</span><span class="green">${fmt(totalRev)}</span></div>
+ <div style="border-top:1px dashed var(--border2);margin:8px 0;"></div>
+ <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;color:${profit>=0?'var(--green)':'var(--red)'};">
+ <span>Net Profit / Loss</span><span>${fmt(profit)}</span>
+ </div>`;
+ renderConsumptionPanel();
+}
+
+// ════════════════════════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════════════════════════
+function renderHistory(){
+ const df=$$('hf-date').value,sf=($$('hf-search').value||'').toLowerCase(),pf=$$('hf-pay').value;
+ let filt=S.sales;
+ if(df)filt=filt.filter(s=>s.date===df);
+ if(sf)filt=filt.filter(s=>s.receiptNo.toLowerCase().includes(sf)||s.customer.toLowerCase().includes(sf));
+ if(pf)filt=filt.filter(s=>s.payMode===pf);
+ const tot=filt.reduce((s,b)=>s+b.total,0);
+ $$('hist-sum').textContent=`${filt.length} bills | ${fmt(tot)}`;
+ $$('ht-body').innerHTML=filt.map(b=>`
+ <tr>
+ <td class="mono muted">${esc(b.receiptNo)}</td>
+ <td>${esc(b.customer)}</td>
+ <td class="muted">${esc(b.table||'—')}</td>
+ <td class="muted">${b.date}</td>
+ <td class="muted">${b.time}</td>
+ <td class="muted">${b.items.length} items</td>
+ <td class="mono">${fmt(b.subtotal)}</td>
+ <td class="green mono">${b.discAmt>0?'-'+fmt(b.discAmt):'—'}</td>
+ <td class="muted mono">${fmt(b.cgst+b.sgst)}</td>
+ <td class="gold mono" style="font-weight:700;">${fmt(b.total)}</td>
+ <td><span class="chip">${esc(b.payMode)}</span></td>
+ <td><div style="display:flex;gap:4px;">
+ <button class="bico btn-sm" onclick="viewBill('${b.id}')">View</button>
+ <button class="bico btn-sm" style="color:var(--red);" onclick="deleteSale('${b.id}')">Delete</button>
+ </div></td>
+ </tr>`).join('');
+ if(!filt.length)$$('ht-body').innerHTML='<tr><td colspan="12" class="erow">No records found</td></tr>';
+}
+
+function clearHistFilters(){$$('hf-date').value='';$$('hf-search').value='';$$('hf-pay').value='';renderHistory();}
+
+function viewBill(id){
+ const bill=S.sales.find(s=>s.id===id);if(!bill)return;
+ $$('vb-paper').innerHTML=buildBillHTML(bill);
+ openModal('mo-viewbill');
+}
+
+async function deleteSale(id){
+ if(!confirm('Delete this bill permanently?'))return;
+ S.sales=S.sales.filter(s=>s.id!==id);
+ await persist('sales');renderHistory();
+}
+
+// ════════════════════════════════════════════════════════════
+// EXPENSES
+// ════════════════════════════════════════════════════════════
+function renderExpenses(){
+ const df=$$('ef-filter-date').value,tf=$$('ef-filter-type').value;
+ let filt=S.expenses;
+ if(df)filt=filt.filter(e=>e.date===df);
+ if(tf)filt=filt.filter(e=>e.type===tf);
+ const tot=filt.reduce((s,e)=>s+e.amount,0);
+ $$('exp-total').textContent=fmt(tot);
+ $$('et-body').innerHTML=filt.map(e=>`
+ <tr>
+ <td><span class="chip">${esc(e.type)}</span></td>
+ <td>${esc(e.desc||'')}</td>
+ <td class="red mono" style="font-weight:700;">${fmt(e.amount)}</td>
+ <td class="muted">${esc(e.payMode)}</td>
+ <td class="muted" style="white-space:nowrap;">${fmtDate(e.date)}</td>
+ <td class="muted">${esc(e.ref||'')}</td>
+ <td><div style="display:flex;gap:5px;">
+ <button class="bico" onclick="editExp('${e.id}')">Edit</button>
+ <button class="bico" style="color:var(--red);" onclick="delExp('${e.id}')">Delete</button>
+ </div></td>
+ </tr>`).join('');
+ if(!filt.length)$$('et-body').innerHTML='<tr><td colspan="7" class="erow">No expenses recorded</td></tr>';
+}
+
+async function saveExpense(){
+ const type=$$('ef-type').value,desc=$$('ef-desc').value.trim(),amount=parseFloat($$('ef-amt').value),payMode=$$('ef-pay').value,date=$$('ef-date').value||today(),ref=$$('ef-ref').value.trim();
+ if(isNaN(amount)||amount<=0){alert('Please enter a valid amount.');return;}
+ const item={type,desc,amount,payMode,date,ref};
+ if(editId_e){const i=S.expenses.findIndex(e=>e.id===editId_e);if(i>=0)S.expenses[i]={id:editId_e,...item};}
+ else S.expenses.push({id:uid(),...item});
+ await persist('expenses');cancelExpEdit();renderExpenses();
+}
+
+function editExp(id){
+ const e=S.expenses.find(e=>e.id===id);if(!e)return;
+ editId_e=id;
+ $$('ef-type').value=e.type;$$('ef-desc').value=e.desc||'';$$('ef-amt').value=e.amount;$$('ef-pay').value=e.payMode;$$('ef-date').value=e.date;$$('ef-ref').value=e.ref||'';
+ $$('eft').textContent=' EDIT EXPENSE';$$('ef-cancel').style.display='inline-flex';
+}
+
+async function delExp(id){if(!confirm('Delete this expense?'))return;S.expenses=S.expenses.filter(e=>e.id!==id);await persist('expenses');renderExpenses();}
+function cancelExpEdit(){editId_e=null;$$('ef-amt').value='';$$('ef-desc').value='';$$('ef-ref').value='';$$('ef-date').value=today();$$('eft').textContent=' ADD EXPENSE';$$('ef-cancel').style.display='none';}
+
+// ════════════════════════════════════════════════════════════
+// STAFF & SALARY
+// ════════════════════════════════════════════════════════════
+function renderStaff(){
+ // Staff list
+ $$('staff-list').innerHTML=S.staff.length?S.staff.map(st=>`
+ <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+ <div>
+ <div style="font-weight:700;">${esc(st.name)}</div>
+ <div class="muted">${esc(st.role)} · ${esc(st.shift||'Full Day')}</div>
+ <div class="muted"> ${esc(st.phone||'—')} | Salary: <span class="gold mono">${fmt(st.salary)}/mo</span></div>
+ </div>
+ <div style="display:flex;gap:5px;">
+ <button class="bico btn-sm" onclick="editStaff('${st.id}')">Edit</button>
+ <button class="bico btn-sm" style="color:var(--red);" onclick="delStaff('${st.id}')">Delete</button>
+ </div>
+ </div>`).join(''):'<div style="color:var(--dim);font-size:12px;padding:10px 0;">No staff added yet</div>';
+
+ // Populate staff dropdown for salary payment
+ const sel=$$('pay-staff');
+ const prev=sel.value;
+ sel.innerHTML='<option value="">Select Staff</option>'+S.staff.map(st=>`<option value="${esc(st.id)}">${esc(st.name)} (${esc(st.role)})</option>`).join('');
+ if(prev)sel.value=prev;
+
+ // Salary log
+ $$('salary-body').innerHTML=S.salaryPayments.map(p=>{
+ const st=S.staff.find(s=>s.id===p.staffId);
+ return `<tr>
+ <td style="font-weight:600;">${esc(st?st.name:'Unknown')}</td>
+ <td class="muted">${esc(st?st.role:'—')}</td>
+ <td class="muted">${fmtMonth(p.month)}</td>
+ <td class="gold mono" style="font-weight:700;">${fmt(p.amount)}</td>
+ <td class="muted">${esc(p.payMode)}</td>
+ <td class="muted" style="white-space:nowrap;">${fmtDate(p.date)}</td>
+ <td class="muted">${esc(p.notes||'')}</td>
+ <td><button class="bico btn-sm" style="color:var(--red);" onclick="delSalary('${p.id}')">Delete</button></td>
+ </tr>`;
+ }).join('');
+ if(!S.salaryPayments.length)$$('salary-body').innerHTML='<tr><td colspan="8" class="erow">No salary payments recorded</td></tr>';
+}
+
+async function saveStaff(){
+ const name=$$('sf-name').value.trim(),role=$$('sf-role').value,shift=$$('sf-shift').value,salary=parseFloat($$('sf-sal').value)||0,phone=$$('sf-ph').value.trim(),joinDate=$$('sf-jdate').value;
+ if(!name){alert('Please enter staff name.');return;}
+ const item={name,role,shift,salary,phone,joinDate};
+ if(editId_s){const i=S.staff.findIndex(s=>s.id===editId_s);if(i>=0)S.staff[i]={id:editId_s,...item};}
+ else S.staff.push({id:uid(),...item});
+ await persist('staff');cancelStaffEdit();renderStaff();
+}
+
+function editStaff(id){
+ const st=S.staff.find(s=>s.id===id);if(!st)return;
+ editId_s=id;
+ $$('sf-name').value=st.name;$$('sf-role').value=st.role;$$('sf-shift').value=st.shift||'Full Day';$$('sf-sal').value=st.salary;$$('sf-ph').value=st.phone||'';$$('sf-jdate').value=st.joinDate||'';
+ $$('sft').textContent=' EDIT STAFF MEMBER';$$('sf-cancel').style.display='inline-flex';
+}
+
+async function delStaff(id){if(!confirm('Delete this staff member?'))return;S.staff=S.staff.filter(s=>s.id!==id);await persist('staff');renderStaff();}
+function cancelStaffEdit(){editId_s=null;['sf-name','sf-sal','sf-ph','sf-jdate'].forEach(i=>$$(i).value='');$$('sf-role').value='Manager';$$('sf-shift').value='Morning';$$('sft').textContent=' STAFF MEMBER';$$('sf-cancel').style.display='none';}
+
+async function saveSalaryPayment(){
+ const staffId=$$('pay-staff').value,amount=parseFloat($$('pay-amt').value),month=$$('pay-month').value,payMode=$$('pay-mode').value,date=$$('pay-date').value||today(),notes=$$('pay-notes').value.trim();
+ if(!staffId){alert('Please select a staff member.');return;}
+ if(isNaN(amount)||amount<=0){alert('Please enter a valid amount.');return;}
+ S.salaryPayments.push({id:uid(),staffId,amount,month,payMode,date,notes});
+ await persist('salaryPayments');
+ $$('pay-amt').value='';$$('pay-notes').value='';$$('pay-staff').value='';$$('pay-month').value='';
+ renderStaff();
+}
+
+async function delSalary(id){if(!confirm('Delete this record?'))return;S.salaryPayments=S.salaryPayments.filter(p=>p.id!==id);await persist('salaryPayments');renderStaff();}
+
+// ════════════════════════════════════════════════════════════
+// DAILY REPORT
+// ════════════════════════════════════════════════════════════
+function renderReport(){
+ const d=$$('rpt-date').value||today();
+ const ds=S.sales.filter(s=>s.date===d);
+ const dr=S.raw.filter(r=>r.date===d);
+ const de=S.expenses.filter(e=>e.date===d);
+ const rev=ds.reduce((s,b)=>s+b.total,0);
+ const sub=ds.reduce((s,b)=>s+b.subtotal,0);
+ const gst=ds.reduce((s,b)=>s+b.cgst+b.sgst,0);
+ const disc=ds.reduce((s,b)=>s+b.discAmt,0);
+ const raw=dr.reduce((s,r)=>s+r.quantity*r.ppu,0);
+ const exp=de.reduce((s,e)=>s+e.amount,0);
+ const sal=S.salaryPayments.filter(p=>p.date===d).reduce((s,p)=>s+p.amount,0);
+ const profit=rev-raw-exp-sal;
+ const cash=ds.filter(b=>b.payMode==='Cash').reduce((s,b)=>s+b.total,0);
+ const card=ds.filter(b=>b.payMode==='Card').reduce((s,b)=>s+b.total,0);
+ const upi=ds.filter(b=>b.payMode==='UPI').reduce((s,b)=>s+b.total,0);
+ const other=ds.filter(b=>b.payMode==='Online').reduce((s,b)=>s+b.total,0);
+
+ const ic={};
+ ds.forEach(b=>b.items.forEach(i=>{if(!ic[i.name])ic[i.name]={qty:0,rev:0};ic[i.name].qty+=i.qty;ic[i.name].rev+=i.price*i.qty;}));
+ const top=Object.entries(ic).sort((a,b)=>b[1].rev-a[1].rev).slice(0,8);
+
+ const rrow=(l,v,c)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;"><span style="color:var(--muted);">${l}</span><span style="font-weight:600;${c?'color:'+c+';':''}">${v}</span></div>`;
+
+ $$('report-block').innerHTML=`
+ <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-family:var(--mono);">
+ <div style="text-align:center;margin-bottom:16px;">
+ <div style="font-size:18px;font-weight:900;color:var(--gold);letter-spacing:2px;">${esc(S.settings.shopName)}</div>
+ <div style="font-size:11px;color:var(--muted);">DAILY BUSINESS REPORT</div>
+ <div style="font-size:11px;color:var(--muted);">Date: ${fmtDate(d)}</div>
+ </div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+ <div>
+ <div style="font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;font-weight:700;">── SALES SUMMARY ──</div>
+ ${rrow('Total Bills',ds.length)}
+ ${rrow('Gross Sales (excl. GST)',fmt(sub))}
+ ${rrow('Discounts Given',fmt(disc),'var(--green)')}
+ ${rrow('GST Collected',fmt(gst))}
+ ${rrow('Net Revenue',fmt(rev),'var(--green)')}
+ <div style="margin-top:10px;font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;font-weight:700;">── PAYMENT BREAKUP ──</div>
+ ${rrow('Cash',fmt(cash))}
+ ${rrow('Card',fmt(card))}
+ ${rrow('UPI',fmt(upi))}
+ ${rrow('Other/Online',fmt(other))}
+ </div>
+ <div>
+ <div style="font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;font-weight:700;">── COST SUMMARY ──</div>
+ ${rrow('Raw Material Cost',fmt(raw),'var(--red)')}
+ ${rrow('Expenses',fmt(exp),'var(--orange)')}
+ ${rrow('Salaries Paid',fmt(sal),'var(--purple)')}
+ <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px dashed var(--border2);margin-top:6px;font-size:14px;font-weight:900;color:${profit>=0?'var(--green)':'var(--red)'};">
+ <span>Net Profit / Loss</span><span>${fmt(profit)}</span>
+ </div>
+ ${top.length?`
+ <div style="margin-top:10px;font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;font-weight:700;">── TOP ITEMS ──</div>
+ ${top.map(([n,d])=>rrow(`${esc(n)} (×${d.qty})`,fmt(d.rev))).join('')}
+ `:''}
+ ${de.length?`
+ <div style="margin-top:10px;font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;font-weight:700;">── TODAY'S EXPENSES ──</div>
+ ${de.map(e=>rrow(esc(e.type),fmt(e.amount),'var(--orange)')).join('')}
+ `:''}
+ </div>
+ </div>
+ ${ds.length===0?'<div style="text-align:center;color:var(--dim);padding:20px;font-size:12px;">No sales recorded on this date</div>':''}
+ </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// REPORT TAB SWITCHER
+// ════════════════════════════════════════════════════════════
+function switchReportTab(tab){
+ const isDaily = tab === 'daily';
+ $$('rpt-daily-panel').style.display = isDaily ? 'block' : 'none';
+ $$('rpt-monthly-panel').style.display = isDaily ? 'none' : 'block';
+ $$('rpt-tab-daily').className = isDaily ? 'btn btn-g' : 'btn btn-d';
+ $$('rpt-tab-monthly').className = isDaily ? 'btn btn-d' : 'btn btn-g';
+ if(!isDaily) renderMonthlyReport();
+ else renderReport();
+}
+
+function printViewBill(){
+ const html=$$('vb-paper').innerHTML;
+ _openPrintWin(`<div style="width:80mm;padding:16px 14px;">${html}</div>`);
+}
+
+function printReport(){
+ document.body.classList.add('print-report');
+ window.print();
+ setTimeout(()=>document.body.classList.remove('print-report'), 800);
+}
+
+// ════════════════════════════════════════════════════════════
+// MONTHLY REPORT
+// ════════════════════════════════════════════════════════════
+function renderMonthlyReport(){
+ const mv = $$('rpt-month').value; // "2026-06"
+ if(!mv){ $$('monthly-report-block').innerHTML='<div style="color:var(--dim);text-align:center;padding:30px;">Please select a month above.</div>'; return; }
+ const [yr, mo] = mv.split('-').map(Number);
+ const monthPrefix = mv; // bills stored as "2026-06-DD"
+
+ // Filter by month
+ const ms = S.sales.filter(s =>s.date && s.date.startsWith(monthPrefix));
+ const mr = S.raw.filter(r =>r.date && r.date.startsWith(monthPrefix));
+ const me = S.expenses.filter(e =>e.date && e.date.startsWith(monthPrefix));
+ const msal = S.salaryPayments.filter(p =>p.date && p.date.startsWith(monthPrefix));
+
+ // ── Sales figures ──
+ const totalBills = ms.length;
+ const totalSub = ms.reduce((s,b)=>s+b.subtotal,0);
+ const totalDisc = ms.reduce((s,b)=>s+(b.discAmt||0),0);
+ const totalGST = ms.reduce((s,b)=>s+b.cgst+b.sgst,0);
+ const totalRev = ms.reduce((s,b)=>s+b.total,0);
+ const avgBillVal = totalBills ? totalRev/totalBills : 0;
+ const cashRev = ms.filter(b=>b.payMode==='Cash').reduce((s,b)=>s+b.total,0);
+ const cardRev = ms.filter(b=>b.payMode==='Card').reduce((s,b)=>s+b.total,0);
+ const upiRev = ms.filter(b=>b.payMode==='UPI').reduce((s,b)=>s+b.total,0);
+ const otherRev = ms.filter(b=>b.payMode==='Online').reduce((s,b)=>s+b.total,0);
+
+ // ── Cost figures ──
+ const rawCost = mr.reduce((s,r)=>s+r.quantity*r.ppu,0);
+ const expTotal = me.reduce((s,e)=>s+e.amount,0);
+ const salTotal = msal.reduce((s,p)=>s+p.amount,0);
+ const totalCost = rawCost + expTotal + salTotal;
+ const netProfit = totalRev - totalCost;
+ const margin = totalRev ? ((netProfit/totalRev)*100).toFixed(1) : '0.0';
+
+ // ── Day-wise sales (busiest days) ──
+ const byDay = {};
+ ms.forEach(b=>{ const d=b.date; if(!byDay[d]) byDay[d]={bills:0,rev:0}; byDay[d].bills++; byDay[d].rev+=b.total; });
+ const daysSorted = Object.entries(byDay).sort((a,b)=>b[1].rev-a[1].rev);
+ const daysInMonth = new Date(yr, mo, 0).getDate();
+ const activeDays = daysSorted.length;
+ const peakDay = daysSorted[0];
+ const slowDay = [...daysSorted].sort((a,b)=>a[1].rev-b[1].rev)[0];
+
+ // ── Top selling items ──
+ const ic={};
+ ms.forEach(b=>b.items.forEach(i=>{ if(!ic[i.name])ic[i.name]={qty:0,rev:0,cat:i.category||''}; ic[i.name].qty+=i.qty; ic[i.name].rev+=i.price*i.qty; }));
+ const topItems = Object.entries(ic).sort((a,b)=>b[1].rev-a[1].rev);
+ const topItemsByQty = Object.entries(ic).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5);
+
+ // ── Expense breakdown ──
+ const expByType={};
+ me.forEach(e=>{ if(!expByType[e.type])expByType[e.type]=0; expByType[e.type]+=e.amount; });
+ const expBreakdown = Object.entries(expByType).sort((a,b)=>b[1]-a[1]);
+
+ // ── Raw material breakdown ──
+ const rawByItem={};
+ mr.forEach(r=>{ const k=r.name+'||'+r.unit; if(!rawByItem[k])rawByItem[k]={name:r.name,unit:r.unit,qty:0,cost:0}; rawByItem[k].qty+=r.quantity; rawByItem[k].cost+=r.quantity*r.ppu; });
+ const rawBreakdown = Object.values(rawByItem).sort((a,b)=>b.cost-a.cost);
+
+ // ── Staff salary breakdown ──
+ const salByStaff={};
+ msal.forEach(p=>{ const st=S.staff.find(s=>s.id===p.staffId); const nm=st?st.name:'Unknown'; if(!salByStaff[nm])salByStaff[nm]=0; salByStaff[nm]+=p.amount; });
+
+ // ── Day-wise trend table (all days of month) ──
+ const dayRows = [];
+ for(let d=1; d<=daysInMonth; d++){
+ const dt = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+ const dd = byDay[dt];
+ dayRows.push({date:dt, bills:dd?dd.bills:0, rev:dd?dd.rev:0});
+ }
+
+ // ── Remaining stock estimate ──
+ // Total ever purchased vs total sold (using menu price as proxy for consumption)
+ const allRawByItem={};
+ S.raw.forEach(r=>{ const k=r.name; if(!allRawByItem[k])allRawByItem[k]={name:r.name,unit:r.unit,purchased:0,purchasedCost:0}; allRawByItem[k].purchased+=r.quantity; allRawByItem[k].purchasedCost+=r.quantity*r.ppu; });
+ const stockRows = Object.values(allRawByItem);
+
+ const monthName = new Date(yr, mo-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+ const rrow=(l,v,c,bold)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;${bold?'font-weight:900;font-size:13px;':''}"><span style="color:${c?'inherit':'var(--muted)'};">${l}</span><span style="font-weight:600;${c?'color:'+c+';':''}">${v}</span></div>`;
+ const sec=(t)=>`<div style="font-size:10px;color:var(--gold);letter-spacing:1px;margin:14px 0 6px;font-weight:700;font-family:var(--mono);border-bottom:1px dashed var(--border2);padding-bottom:4px;">${t}</div>`;
+
+ $$('monthly-report-block').innerHTML=`
+ <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;font-family:var(--mono);" id="monthly-printable">
+
+ <!-- Header -->
+ <div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid var(--border2);">
+ <div style="font-size:20px;font-weight:900;color:var(--gold);letter-spacing:2px;">${esc(S.settings.shopName)}</div>
+ ${S.settings.addr1?`<div style="font-size:11px;color:var(--muted);">${esc(S.settings.addr1)}</div>`:''}
+ ${S.settings.contact?`<div style="font-size:11px;color:var(--muted);"> ${esc(S.settings.contact)}</div>`:''}
+ <div style="font-size:14px;font-weight:700;color:var(--text);margin-top:8px;">MONTHLY BUSINESS REPORT</div>
+ <div style="font-size:13px;color:var(--muted);">${monthName}</div>
+ <div style="font-size:10px;color:var(--dim);margin-top:4px;">Generated on ${fmtDate(today())} at ${nowTime()}</div>
+ </div>
+
+ <!-- KPI cards -->
+ <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+ ${[
+ {l:'Total Revenue',v:fmt(totalRev),c:'var(--green)'},
+ {l:'Total Bills',v:totalBills,c:'var(--gold)'},
+ {l:'Avg Bill Value',v:fmt(avgBillVal),c:'var(--blue)'},
+ {l:'Total Raw Cost',v:fmt(rawCost),c:'var(--red)'},
+ {l:'Total Expenses',v:fmt(expTotal),c:'var(--orange)'},
+ {l:'Total Salaries',v:fmt(salTotal),c:'var(--purple)'},
+ {l:'Net Profit/Loss',v:fmt(netProfit),c:netProfit>=0?'var(--green)':'var(--red)'},
+ {l:'Profit Margin',v:margin+'%',c:netProfit>=0?'var(--green)':'var(--red)'},
+ {l:'Active Days',v:activeDays+'/'+daysInMonth,c:'var(--blue)'},
+ ].map(c=>`<div style="background:var(--s2);border:1px solid ${c.c}33;border-radius:6px;padding:12px;">
+ <div style="font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:4px;">${c.l}</div>
+ <div style="font-size:18px;font-weight:900;color:${c.c};font-family:var(--mono);">${c.v}</div>
+ </div>`).join('')}
+ </div>
+
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+ <!-- LEFT COLUMN -->
+ <div>
+ ${sec('── SALES SUMMARY ──')}
+ ${rrow('Total Bills Issued', totalBills)}
+ ${rrow('Gross Sales (excl. GST)', fmt(totalSub))}
+ ${rrow('Discounts Given', fmt(totalDisc), 'var(--green)')}
+ ${rrow('GST Collected', fmt(totalGST))}
+ ${rrow('Net Revenue', fmt(totalRev), 'var(--green)', true)}
+
+ ${sec('── PAYMENT BREAKUP ──')}
+ ${rrow('Cash', fmt(cashRev)+ (totalRev?' ('+((cashRev/totalRev)*100).toFixed(1)+'%)':''))}
+ ${rrow('Card', fmt(cardRev)+ (totalRev?' ('+((cardRev/totalRev)*100).toFixed(1)+'%)':''))}
+ ${rrow('UPI', fmt(upiRev) + (totalRev?' ('+((upiRev/totalRev)*100).toFixed(1)+'%)':''))}
+ ${rrow('Other/Online', fmt(otherRev))}
+
+ ${sec('── COST SUMMARY ──')}
+ ${rrow('Raw Material Cost', fmt(rawCost), 'var(--red)')}
+ ${rrow('Expenses', fmt(expTotal), 'var(--orange)')}
+ ${rrow('Staff Salaries', fmt(salTotal), 'var(--purple)')}
+ ${rrow('Total Cost', fmt(totalCost), 'var(--red)', true)}
+ <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:15px;font-weight:900;color:${netProfit>=0?'var(--green)':'var(--red)'};border-top:2px solid var(--border2);margin-top:4px;">
+ <span>NET PROFIT / LOSS</span><span>${fmt(netProfit)}</span>
+ </div>
+ <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:${netProfit>=0?'var(--green)':'var(--red)'};">
+ <span>Profit Margin</span><span>${margin}%</span>
+ </div>
+
+ ${peakDay?`${sec('── PEAK & SLOW DAYS ──')}
+ ${rrow('Best Day', fmtDate(peakDay[0])+' · '+fmt(peakDay[1].rev), 'var(--green)')}
+ ${slowDay?rrow('Slowest Day', fmtDate(slowDay[0])+' · '+fmt(slowDay[1].rev), 'var(--muted)'):''}
+ ${rrow('Avg Daily Revenue', fmt(activeDays?totalRev/activeDays:0))}
+ ${rrow('Avg Bills/Day', (activeDays?totalBills/activeDays:0).toFixed(1))}`:''}
+
+ ${expBreakdown.length?`${sec('── EXPENSE BREAKDOWN ──')}
+ ${expBreakdown.map(([t,a])=>rrow(t, fmt(a)+(expTotal?' ('+((a/expTotal)*100).toFixed(1)+'%)':''), 'var(--orange)')).join('')}`:''}
+
+ ${Object.keys(salByStaff).length?`${sec('── SALARY PAID ──')}
+ ${Object.entries(salByStaff).map(([n,a])=>rrow(n, fmt(a), 'var(--purple)')).join('')}`:''}
+ </div>
+
+ <!-- RIGHT COLUMN -->
+ <div>
+ ${sec('── TOP SELLING ITEMS (REVENUE) ──')}
+ ${topItems.slice(0,10).map(([n,d],i)=>`
+ <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
+ <span style="color:var(--muted);">#${i+1} ${esc(n)}</span>
+ <span style="display:flex;gap:10px;">
+ <span style="color:var(--muted);">×${d.qty}</span>
+ <span style="color:var(--gold);font-weight:700;">${fmt(d.rev)}</span>
+ </span>
+ </div>`).join('')}
+ ${!topItems.length?'<div style="color:var(--dim);font-size:12px;padding:8px 0;">No sales this month</div>':''}
+
+ ${sec('── TOP BY QUANTITY SOLD ──')}
+ ${topItemsByQty.map(([n,d])=>rrow(esc(n), d.qty+' units · '+fmt(d.rev))).join('')}
+
+ ${sec('── RAW MATERIALS PURCHASED ──')}
+ ${rawBreakdown.length?rawBreakdown.map(r=>`
+ <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
+ <span style="color:var(--muted);">${esc(r.name)}</span>
+ <span style="display:flex;gap:8px;">
+ <span style="color:var(--muted);">${r.qty} ${esc(r.unit)}</span>
+ <span style="color:var(--red);font-weight:700;">${fmt(r.cost)}</span>
+ </span>
+ </div>`).join(''):'<div style="color:var(--dim);font-size:12px;padding:8px 0;">No purchases this month</div>'}
+
+ ${sec('── CUMULATIVE STOCK (ALL TIME) ──')}
+ <div style="font-size:10px;color:var(--dim);margin-bottom:6px;">Total ever purchased across all months</div>
+ ${stockRows.length?`<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+ <thead><tr style="background:var(--s2);">
+ <th style="padding:6px 8px;text-align:left;color:var(--gold);font-size:9px;">MATERIAL</th>
+ <th style="padding:6px 8px;text-align:left;color:var(--gold);font-size:9px;">TOTAL QTY</th>
+ <th style="padding:6px 8px;text-align:left;color:var(--gold);font-size:9px;">UNIT</th>
+ <th style="padding:6px 8px;text-align:left;color:var(--gold);font-size:9px;">TOTAL COST</th>
+ </thead>
+ <tbody>
+ ${stockRows.map(r=>`<tr><td style="padding:5px 8px;border-bottom:1px solid var(--border);">${esc(r.name)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--green);">${r.purchased}</td><td style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);">${esc(r.unit)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--red);font-weight:700;">${fmt(r.purchasedCost)}</td></tr>`).join('')}
+ </tbody>
+ </table></div>`:'<div style="color:var(--dim);font-size:12px;padding:8px 0;">No stock data</div>'}
+ </div>
+ </div>
+
+ <!-- Day-wise trend -->
+ ${sec('── DAY-WISE SALES TREND ──')}
+ <div class="tw" style="margin-top:4px;">
+ <table style="width:100%;border-collapse:collapse;font-size:11px;">
+ <thead><tr style="background:var(--s2);">
+ <th style="padding:6px 10px;text-align:left;color:var(--gold);font-size:9px;">DATE</th>
+ <th style="padding:6px 10px;text-align:left;color:var(--gold);font-size:9px;">BILLS</th>
+ <th style="padding:6px 10px;text-align:left;color:var(--gold);font-size:9px;">REVENUE</th>
+ <th style="padding:6px 10px;text-align:left;color:var(--gold);font-size:9px;">BAR</th>
+ </tr></thead>
+ <tbody>
+ ${dayRows.map(row=>{
+ const pct = peakDay ? (row.rev/peakDay[1].rev)*100 : 0;
+ return `<tr style="${row.bills===0?'opacity:0.35;':''}">
+ <td style="padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap;">${fmtDate(row.date)}</td>
+ <td style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted);">${row.bills||'—'}</td>
+ <td style="padding:5px 10px;border-bottom:1px solid var(--border);color:var(--gold);font-weight:${row.bills?'700':'400'};">${row.bills?fmt(row.rev):'—'}</td>
+ <td style="padding:5px 10px;border-bottom:1px solid var(--border);">
+ ${row.bills?`<div style="background:var(--green);height:8px;border-radius:3px;width:${Math.max(2,pct)}%;opacity:0.8;"></div>`:''}
+ </td>
+ </tr>`;
+ }).join('')}
+ </tbody>
+ </table>
+ </div>
+
+ ${ms.length===0?'<div style="text-align:center;color:var(--dim);padding:30px;font-size:13px;margin-top:20px;border-top:1px solid var(--border);">No sales data found for '+monthName+'</div>':''}
+
+ <div style="text-align:center;margin-top:20px;padding-top:12px;border-top:1px solid var(--border);font-size:10px;color:var(--dim);">Report generated by BrewOps · ${esc(S.settings.shopName)} · ${monthName}
+ </div>
+ </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RECIPE — SALES vs MATERIALS
+// ════════════════════════════════════════════════════════════
+let _recipeMenuId = null;
+
+// Get unique material options grouped by name+unit (ignores purchase date / multiple entries)
+function buildRawOptions(selectedKey) {
+ const seen = new Map();
+ S.raw.forEach(r => {
+ const key = r.name + '|' + r.unit;
+ if (!seen.has(key)) seen.set(key, { key, name: r.name, unit: r.unit });
+ });
+ if (!seen.size) return '';
+ return Array.from(seen.values()).map(r =>
+ `<option value="${r.key}" data-unit="${esc(r.unit)}" ${r.key === selectedKey ? 'selected' : ''}>${esc(r.name)} (${esc(r.unit)})</option>`
+ ).join('');
+}
+
+function openRecipe(menuId) {
+ const m = S.menu.find(x =>x.id === menuId);
+ if (!m) return;
+ _recipeMenuId = menuId;
+ $$('rec-item-name').textContent = m.name;
+ $$('rec-rows').innerHTML = '';
+ const noRaw = $$('rec-no-raw');
+ if (!S.raw.length) { noRaw.style.display = 'block'; } else { noRaw.style.display = 'none'; }
+ const recipe = m.recipe || [];
+ if (recipe.length) { recipe.forEach(r =>addRecipeRow(r)); }
+ else { addRecipeRow(null); }
+ openModal('mo-recipe');
+}
+
+function addRecipeRow(existing) {
+ const container = $$('rec-rows');
+ const opts = buildRawOptions(existing ? existing.rawKey : null);
+ const div = document.createElement('div');
+ div.className = 'recipe-row';
+ div.style.cssText = 'display:flex;gap:8px;align-items:flex-end;margin-bottom:9px;background:var(--s2);padding:10px 11px;border-radius:6px;border:1px solid var(--border);flex-wrap:wrap;';
+ div.innerHTML = `
+ <div class="fg" style="flex:1;min-width:160px;">
+ <label>INGREDIENT (RAW MATERIAL)</label>
+ <select class="rr-raw" style="width:100%;" onchange="syncRecipeUnit(this)">
+ <option value="">— Select material —</option>
+ ${opts}
+ </select>
+ </div>
+ <div class="fg" style="width:110px;">
+ <label>QTY PER UNIT SOLD</label>
+ <input class="rr-qty" type="number" min="0" step="0.001" placeholder="e.g. 0.1" style="width:100%;" value="${existing ? existing.qty : ''}">
+ </div>
+ <div class="fg" style="width:80px;">
+ <label>UNIT</label>
+ <input class="rr-unit" style="width:100%;background:var(--beige-light);color:var(--muted);cursor:default;" readonly placeholder="auto" value="${existing ? existing.unit : ''}">
+ </div>
+ <button class="btn btn-r btn-sm" onclick="this.closest('.recipe-row').remove()" style="margin-bottom:1px;flex-shrink:0;">Remove</button>
+ `;
+ container.appendChild(div);
+}
+
+function syncRecipeUnit(sel) {
+ const opt = sel.options[sel.selectedIndex];
+ const unitInput = sel.closest('.recipe-row').querySelector('.rr-unit');
+ unitInput.value = (opt && opt.dataset.unit) ? opt.dataset.unit : '';
+}
+
+async function saveRecipe() {
+ const rows = document.querySelectorAll('#rec-rows .recipe-row');
+ const recipe = [];
+ for (const row of rows) {
+ const rawSel = row.querySelector('.rr-raw');
+ const rawKey = rawSel.value;
+ if (!rawKey) continue;
+ const qty = parseFloat(row.querySelector('.rr-qty').value);
+ const unit = row.querySelector('.rr-unit').value;
+ if (isNaN(qty) || qty <= 0) { alert('Please enter a valid quantity greater than 0 for all ingredients.'); return; }
+ const rawName = rawKey.split('|')[0];
+ recipe.push({ rawKey, rawName, qty, unit });
+ }
+ const idx = S.menu.findIndex(m =>m.id === _recipeMenuId);
+ if (idx < 0) return;
+ S.menu[idx].recipe = recipe;
+ await persist('menu');
+ closeModal('mo-recipe');
+ renderMenuTable();
+ const name = S.menu[idx].name;
+ alert(` Recipe saved — ${recipe.length} ingredient${recipe.length !== 1 ? 's' : ''} linked to "${name}".\nStock will auto-deduct on every bill containing this item.`);
+}
+
+// Build list of materials consumed from cart items using their recipes
+function buildMaterialsUsed(cartItems) {
+ const totals = {};
+ for (const ci of cartItems) {
+ const menuItem = S.menu.find(m =>m.id === ci.id);
+ if (!menuItem || !menuItem.recipe || !menuItem.recipe.length) continue;
+ for (const ing of menuItem.recipe) {
+ const key = ing.rawKey;
+ if (!totals[key]) totals[key] = { rawKey: key, rawName: ing.rawName, unit: ing.unit, qtyUsed: 0 };
+ totals[key].qtyUsed += ing.qty * ci.qty;
+ }
+ }
+ return Object.values(totals);
+}
+
+// Deduct from stock using FIFO (oldest purchase entry first per material)
+async function deductRawStock(materialsUsed) {
+ if (!materialsUsed.length) return;
+ let changed = false;
+ for (const used of materialsUsed) {
+ const [matName, matUnit] = used.rawKey.split('|');
+ // Get all entries for this material sorted by date ASC (oldest first)
+ const entries = S.raw
+ .map((r, i) => ({ ...r, _i: i }))
+ .filter(r =>r.name === matName && r.unit === matUnit)
+ .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+ let remaining = used.qtyUsed;
+ for (const entry of entries) {
+ if (remaining <= 0) break;
+ const deduct = Math.min(entry.quantity, remaining);
+ S.raw[entry._i].quantity = Math.max(0, parseFloat((entry.quantity - deduct).toFixed(4)));
+ remaining -= deduct;
+ changed = true;
+ }
+ }
+ if (changed) await persist('raw');
+}
+
+// Aggregate materialsUsed from a set of sales records (for reporting)
+function computeMaterialsUsed(salesArr) {
+ const totals = {};
+ for (const sale of salesArr) {
+ if (!sale.materialsUsed) continue;
+ for (const m of sale.materialsUsed) {
+ const key = m.rawKey || (m.rawName + '|' + m.unit);
+ if (!totals[key]) totals[key] = { rawKey: key, name: m.rawName, unit: m.unit, qty: 0 };
+ totals[key].qty += m.qtyUsed;
+ }
+ }
+ return Object.values(totals);
+}
+
+function setConsRange(range) {
+ const now = new Date();
+ let from = '', to = today();
+ if (range === 'today') { from = today(); }
+ else if (range === 'week') { const d = new Date(now); d.setDate(d.getDate() - 6); from = d.toISOString().slice(0, 10); }
+ else if (range === 'month') { from = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`; }
+ $$('cons-from').value = from;
+ $$('cons-to').value = to;
+ renderConsumptionPanel();
+}
+
+function renderConsumptionPanel() {
+ const fromDate = ($$('cons-from') || {}).value || '';
+ const toDate = ($$('cons-to') || {}).value || '';
+ let filt = S.sales;
+ if (fromDate) filt = filt.filter(s =>s.date >= fromDate);
+ if (toDate) filt = filt.filter(s =>s.date <= toDate);
+
+ // ── Materials consumed table ──
+ const used = computeMaterialsUsed(filt);
+ const consEl = $$('cons-body');
+ if (!used.length) {
+ consEl.innerHTML = '<tr><td colspan="5" class="erow">No consumption recorded. Set recipes in Menu tab first, then generate bills.</td></tr>';
+ } else {
+ consEl.innerHTML = used.map(u => {
+ const [matName, matUnit] = u.rawKey.split('|');
+ const currentStock = S.raw.filter(r =>r.name === matName && r.unit === matUnit).reduce((s, r) =>s + r.quantity, 0);
+ const minStk = Math.max(...S.raw.filter(r =>r.name === matName && r.unit === matUnit).map(r =>r.minStock || 0), 0);
+ const isLow = currentStock <= minStk || currentStock < u.qty * 0.15;
+ const pct = u.qty > 0 ? Math.min(100, (currentStock / (currentStock + u.qty)) * 100) : 100;
+ return `<tr>
+ <td style="font-weight:600;">${esc(u.name)}</td>
+ <td class="blue mono" style="font-weight:700;">${parseFloat(u.qty.toFixed(3))}</td>
+ <td class="muted">${esc(u.unit)}</td>
+ <td>
+ <div style="font-family:var(--mono);font-weight:700;font-size:12px;margin-bottom:3px;color:${isLow?'var(--red)':'var(--green)'};">${parseFloat(currentStock.toFixed(3))} ${esc(u.unit)}</div>
+ <div style="background:var(--s3);border-radius:3px;height:5px;width:100%;"><div style="background:${isLow?'var(--red)':'var(--green)'};height:5px;border-radius:3px;width:${pct.toFixed(1)}%;transition:width .3s;"></div></div>
+ </td>
+ <td>${isLow
+ ? '<span style="color:var(--red);font-size:10px;font-weight:700;">LOW</span>'
+ : '<span style="color:var(--green);font-size:10px;font-weight:700;">OK</span>'}</td>
+ </tr>`;
+ }).join('');
+ }
+
+ // ── Items sold + ingredients used ──
+ const itemsSold = {};
+ filt.forEach(s =>s.items.forEach(i => {
+ if (!itemsSold[i.name]) {
+ const mi = S.menu.find(m =>m.id === i.id);
+ itemsSold[i.name] = { qty: 0, recipe: (mi && mi.recipe) ? mi.recipe : [] };
+ }
+ itemsSold[i.name].qty += i.qty;
+ }));
+ const consItemsEl = $$('cons-items-body');
+ const entries = Object.entries(itemsSold);
+ if (!entries.length) {
+ consItemsEl.innerHTML = '<tr><td colspan="3" class="erow">No sales in this period.</td></tr>';
+ } else {
+ consItemsEl.innerHTML = entries
+ .sort((a, b) =>b[1].qty - a[1].qty)
+ .map(([name, d]) => {
+ const ingList = d.recipe.length
+ ? d.recipe.map(r => {
+ const totalUsed = parseFloat((r.qty * d.qty).toFixed(3));
+ return `<span style="display:inline-block;background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:1px 6px;font-size:10px;margin:1px;">${esc(r.rawName)}: ${totalUsed} ${esc(r.unit)}</span>`;
+ }).join('')
+ : '<span style="color:var(--dim);font-size:10px;">No recipe set</span>';
+ return `<tr>
+ <td style="font-weight:600;">${esc(name)}</td>
+ <td class="gold mono" style="font-weight:700;">${d.qty}</td>
+ <td>${ingList}</td>
+ </tr>`;
+ }).join('');
+ }
+}
+
+// ════════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════════
+function loadSettings(){
+ const s=S.settings;
+ $$('s-name').value=s.shopName||'';$$('s-tag').value=s.tagline||'';$$('s-addr1').value=s.addr1||'';$$('s-addr2').value=s.addr2||'';$$('s-contact').value=s.contact||'';$$('s-email').value=s.email||'';$$('s-gstin').value=s.gstin||'';$$('s-fssai').value=s.fssai||'';$$('s-thanks').value=s.thanks||'';$$('s-upiid').value=s.upiId||'';
+ $$('s-gsten').checked=s.gstEnabled;$$('s-cgst').value=s.cgst;$$('s-sgst').value=s.sgst;
+ $$('s-copies').value=String(s.printCopies||2);
+ $$('s-kot').checked=s.printKOT!==false;$$('s-qrshow').checked=s.showQR!==false;
+ // PhonePe
+ $$('s-ppen').checked=s.ppEnabled||false;
+ $$('s-ppupi').value=s.ppUpiId||'';
+ $$('s-ppmid').value=s.ppMerchantId||'';
+ $$('s-ppproxy').value=s.ppProxyUrl||'';
+ $$('s-ppredirect').value=s.ppRedirectUrl||'';
+ $$('s-ppenv').value=s.ppEnv||'sandbox';
+ _applyPhonePeMode(s.ppEnabled);
+ toggleGstF();
+ refreshQRUI();
+}
+
+function toggleGstF(){$$('gst-fields').style.display=$$('s-gsten').checked?'block':'none';}
+
+async function saveSettings(){
+ S.settings={
+ shopName:$$('s-name').value||'My Café', tagline:$$('s-tag').value, addr1:$$('s-addr1').value, addr2:$$('s-addr2').value,
+ contact:$$('s-contact').value, email:$$('s-email').value, gstin:$$('s-gstin').value, fssai:$$('s-fssai').value,
+ thanks:$$('s-thanks').value||'Thank you!',
+ gstEnabled:$$('s-gsten').checked, cgst:parseFloat($$('s-cgst').value)||0, sgst:parseFloat($$('s-sgst').value)||0,
+ printCopies:parseInt($$('s-copies').value)||2, printKOT:$$('s-kot').checked, showQR:$$('s-qrshow').checked,
+ upiId:$$('s-upiid').value.trim(),
+ ppEnabled:$$('s-ppen').checked,
+ ppUpiId:$$('s-ppupi').value.trim(),
+ ppMerchantId:$$('s-ppmid').value.trim(),
+ ppProxyUrl:$$('s-ppproxy').value.trim(),
+ ppRedirectUrl:$$('s-ppredirect').value.trim(),
+ ppEnv:$$('s-ppenv').value||'sandbox'
+ };
+ await persist('settings');
+ $$('shop-display').textContent=S.settings.shopName;
+ _applyPhonePeMode(S.settings.ppEnabled);
+ renderGrid();renderCart();
+ syncMenuToCloud();
+ alert(' Settings saved!');
+}
+
+function _applyPhonePeMode(enabled){
+ const btn=$$('pmb-phonepe');
+ if(!btn)return;
+ const hasPG=enabled&&S.settings.ppMerchantId&&S.settings.ppProxyUrl;
+ const hasUPI=enabled&&S.settings.ppUpiId;
+ const label=hasPG?'Pe PG':(hasUPI?'Pe UPI':'PhonePe');
+ btn.textContent=label;
+ btn.style.display=enabled?'':'none';
+}
+
+async function factoryReset(){
+ const inp = ($$('reset-confirm-inp').value||'').trim().toUpperCase();
+ if(inp !== 'RESET'){
+ alert('Please type RESET in the confirmation box to proceed.');
+ return;
+ }
+ if(!confirm('FINAL WARNING: This will delete every single record — sales, menu, raw materials, staff, expenses, salary, QR code and all settings. Are you absolutely sure?')){
+ return;
+ }
+ // Wipe IndexedDB
+ try{
+ const keys=['menu','raw','sales','expenses','staff','salaryPayments','settings','pass','qrData'];
+ // Also wipe monthly invoice counters
+ const tx=db.transaction('data','readwrite');
+ const store=tx.objectStore('data');
+ const req=store.getAllKeys();
+ req.onsuccess=async()=>{
+ for(const k of req.result){ store.delete(k); }
+ };
+ await new Promise((r)=>{ tx.oncomplete=r; tx.onerror=r; });
+ }catch(e){}
+ // Wipe localStorage fallback
+ try{
+ Object.keys(localStorage).filter(k=>k.startsWith('cafeos_')||k.startsWith('inv_counter_')).forEach(k=>localStorage.removeItem(k));
+ }catch(e){}
+ alert(' All data has been deleted. The app will now reload fresh.');
+ window.location.reload();
+}
+
+async function changePass(){
+ const np=$$('s-np').value,cp=$$('s-cp').value,pm=$$('pm');
+ if(np.length<4){pm.innerHTML='<span class="red">Min 4 characters</span>';return;}
+ if(np!==cp){pm.innerHTML='<span class="red">Passwords do not match</span>';return;}
+ S.pass=np;await dbSet('pass',S.pass);
+ $$('s-np').value='';$$('s-cp').value='';
+ pm.innerHTML='<span class="green">Password changed successfully</span>';
+ setTimeout(()=>pm.textContent='',3000);
+}
+
+// ════════════════════════════════════════════════════════════
+// DAILY STOCK LIMIT
+// S.dailyStock = { [menuItemId]: { date:'YYYY-MM-DD', sold:N } }
+// Counts reset automatically when the date changes.
+// Only items with dailyLimit > 0 are tracked.
+// ════════════════════════════════════════════════════════════
+function resetDailyIfNeeded(){
+ const t=today();let changed=false;
+ for(const id in S.dailyStock){
+ if(S.dailyStock[id].date!==t){S.dailyStock[id]={date:t,sold:0};changed=true;}
+ }
+ if(changed)persist('dailyStock');
+}
+
+function getDailySold(menuId){
+ const e=S.dailyStock[menuId];
+ return(e&&e.date===today())?e.sold||0:0;
+}
+
+function updateDailyStock(billItems){
+ const t=today();let changed=false;
+ for(const ci of billItems){
+ const m=S.menu.find(x=>x.id===ci.id);
+ if(!m||!m.dailyLimit)continue;
+ if(!S.dailyStock[ci.id]||S.dailyStock[ci.id].date!==t)S.dailyStock[ci.id]={date:t,sold:0};
+ S.dailyStock[ci.id].sold=(S.dailyStock[ci.id].sold||0)+ci.qty;
+ changed=true;
+ }
+ if(changed)persist('dailyStock');
+}
+
+function isDailySoldOut(item){
+ if(!item.dailyLimit||item.dailyLimit<=0)return false;
+ return getDailySold(item.id)>=item.dailyLimit;
+}
+
+function getDailyRemaining(item){
+ if(!item.dailyLimit||item.dailyLimit<=0)return null;
+ return Math.max(0,item.dailyLimit-getDailySold(item.id));
+}
+
+// ════════════════════════════════════════════════════════════
+// BACKUP & RESTORE
+// ════════════════════════════════════════════════════════════
+let _importMode = 'replace';
+
+function setImportMode(mode, btn) {
+ _importMode = mode;
+ document.querySelectorAll('#imp-mode-replace,#imp-mode-merge').forEach(b =>b.classList.remove('active'));
+ btn.classList.add('active');
+ const desc = $$('imp-mode-desc');
+ if (mode === 'replace') {
+ desc.innerHTML = '<b>Replace All:</b> Wipes current data and loads everything from the backup file. Use this when migrating to a new laptop.';
+ } else {
+ desc.innerHTML = '<b>Merge / Append:</b> Keeps your existing data and adds any new records from the backup (skips duplicates by ID). Useful for combining data from two devices.';
+ }
+}
+
+async function exportBackup() {
+ try {
+ // Collect all keys from IndexedDB
+ const allKeys = await new Promise((res, rej) => {
+ const tx = db.transaction(DB_STORE, 'readonly');
+ const req = tx.objectStore(DB_STORE).getAllKeys();
+ req.onsuccess = () =>res(req.result);
+ req.onerror = () =>rej(req.error);
+ });
+ const allVals = await new Promise((res, rej) => {
+ const tx = db.transaction(DB_STORE, 'readonly');
+ const req = tx.objectStore(DB_STORE).getAll();
+ req.onsuccess = () =>res(req.result);
+ req.onerror = () =>rej(req.error);
+ });
+
+ const payload = { _version: SCHEMA_VERSION, _exportedAt: new Date().toISOString(), _app: 'BrewOps', data: {} };
+ allKeys.forEach((k, i) => { payload.data[k] = allVals[i]; });
+
+ const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement('a');
+ const shopSlug = (S.settings.shopName || 'cafeos').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+ const dateStr = new Date().toISOString().slice(0, 10);
+ a.href = url;
+ a.download = `${shopSlug}_backup_${dateStr}.json`;
+ a.click();
+ URL.revokeObjectURL(url);
+
+ const totalSales = (S.sales || []).length;
+ const totalMenu = (S.menu || []).length;
+ $$('export-info').textContent = ` Exported — ${totalMenu} menu items · ${totalSales} sales · schema v${SCHEMA_VERSION}`;
+ setTimeout(() => { $$('export-info').textContent = ''; }, 5000);
+ } catch (e) {
+ alert('Export failed: ' + e.message);
+ }
+}
+
+function handleImportDrop(e) {
+ e.preventDefault();
+ $$('import-drop-zone').style.borderColor = '#b0d4b8';
+ const file = e.dataTransfer.files[0];
+ if (file) processImportFile(file);
+}
+
+function importBackup(input) {
+ const file = input.files[0];
+ if (file) processImportFile(file);
+ input.value = '';
+}
+
+async function processImportFile(file) {
+ const statusEl = $$('import-status');
+ statusEl.style.display = 'block';
+ statusEl.className = 'alert alert-warn';
+ statusEl.textContent = ' Reading file…';
+
+ try {
+ const text = await file.text();
+ const payload = JSON.parse(text);
+
+ if (!payload._app || !['BrewOps','CafeOSPro'].includes(payload._app) || !payload.data) {
+ statusEl.className = 'alert alert-err';
+ statusEl.textContent = ' Invalid backup file. Please use a file exported from BrewOps.';
+ return;
+ }
+
+ const backupVersion = parseInt(payload._version) || 1;
+ const exportedAt = payload._exportedAt ? new Date(payload._exportedAt).toLocaleString() : 'unknown date';
+ const needsMigration = backupVersion < SCHEMA_VERSION;
+
+ // Build confirm message — tell user if migration will run
+ let confirmMsg = `Import backup from ${exportedAt}?\n`;
+ confirmMsg += `Backup version: v${backupVersion} | App version: v${SCHEMA_VERSION}\n`;
+ if (needsMigration) {
+ confirmMsg += `\n Auto-migration will run (v${backupVersion} → v${SCHEMA_VERSION}).\n`;
+ confirmMsg += `Your old records will be upgraded — no data will be lost.\n`;
+ }
+ confirmMsg += `\nMode: ${_importMode === 'replace'
+ ? 'REPLACE ALL (current data will be wiped)'
+ : 'MERGE (new records added, existing kept)'}\n\nProceed?`;
+
+ const confirmed = confirm(confirmMsg);
+ if (!confirmed) { statusEl.style.display = 'none'; return; }
+
+ // ── Run migrations on the imported data if needed ──
+ let srcData = payload.data;
+ let migrationSteps = [];
+ if (needsMigration) {
+ statusEl.textContent = ` Migrating data v${backupVersion} → v${SCHEMA_VERSION}…`;
+ const result = await applyMigrations(srcData, backupVersion);
+ srcData = result.data;
+ migrationSteps = result.steps;
+ }
+
+ if (_importMode === 'replace') {
+ // Wipe DB then write all migrated keys
+ await new Promise((res, rej) => {
+ const tx = db.transaction(DB_STORE, 'readwrite');
+ const store = tx.objectStore(DB_STORE);
+ const req = store.getAllKeys();
+ req.onsuccess = () => { req.result.forEach(k =>store.delete(k)); };
+ tx.oncomplete = res; tx.onerror = rej;
+ });
+ for (const [k, v] of Object.entries(srcData)) {
+ await dbSet(k, v);
+ }
+ // Store the current schema version so startup migration won't re-run
+ await dbSet('schemaVersion', SCHEMA_VERSION);
+
+ const migNote = migrationSteps.length
+ ? ` · Migrated steps: ${migrationSteps.map(s=>'v'+s).join(', ')}`
+ : '';
+ statusEl.className = 'alert alert-ok';
+ statusEl.textContent = ` Restore complete${migNote}. Reloading…`;
+ setTimeout(() =>window.location.reload(), 1400);
+
+ } else {
+ // Merge mode — deduplicate by ID for each array key
+ const arrayKeys = ['menu', 'raw', 'sales', 'expenses', 'staff', 'salaryPayments'];
+ let added = 0;
+ for (const key of arrayKeys) {
+ if (!srcData[key]) continue;
+ const existing = S[key] || [];
+ const existingIds = new Set(existing.map(r =>r.id));
+ const newItems = srcData[key].filter(r => !existingIds.has(r.id));
+ added += newItems.length;
+ S[key] = [...existing, ...newItems];
+ await persist(key);
+ }
+ await dbSet('schemaVersion', SCHEMA_VERSION);
+
+ const migNote = migrationSteps.length
+ ? ` · Migrated: ${migrationSteps.map(s=>'v'+s).join(', ')}`
+ : '';
+ statusEl.className = 'alert alert-ok';
+ statusEl.textContent = ` Merged ${added} new records${migNote}. Reloading…`;
+ setTimeout(() =>window.location.reload(), 1400);
+ }
+ } catch (e) {
+ statusEl.className = 'alert alert-err';
+ statusEl.textContent = ' Failed to import: ' + e.message;
+ }
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+async function init(){
+ await openDB();
+ await loadAll();
+ await checkAndMigrateSchema(); // upgrade existing DB data if app was updated
+ resetDailyIfNeeded(); // reset daily sold counts if date has changed
+ $$('shop-display').textContent=S.settings.shopName;
+ $$('rpt-date').value=today();
+ const _now=new Date();
+ $$('rpt-month').value=`${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+ $$('rf-date').value=today();
+ $$('ef-date').value=today();
+ $$('pay-date').value=today();
+ const now=new Date();
+ $$('pay-month').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+ if(S.qrData){refreshQRUI();}
+ // Show schema version badge in Backup card
+ const svb = $$('schema-ver-badge');
+ if (svb) svb.textContent = `SCHEMA v${SCHEMA_VERSION}`;
+ // Init consumption date range to today
+ const consFrom = $$('cons-from');
+ const consTo = $$('cons-to');
+ if (consFrom) consFrom.value = today();
+ if (consTo) consTo.value = today();
+ renderGrid();renderCart();
+ fbInit(); // connect to Firebase for Online Orders + menu sync
+ // Auto-save every 60s as extra safety
+ setInterval(async()=>{for(const k of['menu','raw','sales','expenses','staff','salaryPayments','settings'])await persist(k);},60000);
+}
+
+init();
+</script>
+</body>
+</html>
