@@ -237,7 +237,7 @@ function showConnError(){ $$('conn-banner').style.display='block'; }
 
 async function loadMenu(){
   // Timeout after 10 seconds so it never hangs silently
-  const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000));
+  const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),30000));
   try{
     const [menuDoc,settingsDoc]=await Promise.race([
       Promise.all([
@@ -280,7 +280,7 @@ async function loadMenu(){
         <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:8px;">Could not load the menu</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
           ${isSafariBlock
-            ? 'Safari may be blocking the connection.<br>Try: <b>Safari → Settings → Privacy → uncheck "Prevent cross-site tracking"</b><br>Or open this page in <b>Chrome</b> or <b>Firefox</b>.'
+            ? 'Could not reach Firebase.<br><b>Error:</b> ' + err.message + '<br><br>Check internet connection or ask staff for help.'
             : 'Check your internet connection or ask a staff member for help.'}
         </div>
         <button onclick="location.reload()" style="background:var(--gold);color:white;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:13px;font-family:var(--sans);cursor:pointer;">Retry</button>
