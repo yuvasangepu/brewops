@@ -6,15 +6,12 @@
   publish    = "public"
 
 # ── PhonePe SANDBOX Test Credentials ──────────────────────────
-# These are PhonePe's official public test credentials (safe to commit).
-# Replace with REAL credentials when going live.
 [build.environment]
   PP_MERCHANT_ID  = "PGTESTPAYUAT"
   PP_SALT_KEY     = "099eb0cd-02cf-4dc2-a4c3-f5a4b9e0f9d5"
   PP_SALT_INDEX   = "1"
-  # ⬇ UPDATE THIS after Netlify gives you your site URL
-  PP_REDIRECT_URL = "https://YOUR-SITE.netlify.app/customer-menu.html"
-  PP_CALLBACK_URL = "https://YOUR-SITE.netlify.app/.netlify/functions/phonepe-webhook"
+  PP_REDIRECT_URL = "https://brewops1.netlify.app/customer-menu.html"
+  PP_CALLBACK_URL = "https://brewops1.netlify.app/.netlify/functions/phonepe-webhook"
 
 # ── Route /api/phonepe/* → Netlify Functions ──────────────────
 [[redirects]]
